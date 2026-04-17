@@ -29,16 +29,6 @@
 		39F372992F878E54009A1CF2 /* New-Pol-MureUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Pol-MureUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		398138992F922645009C4656 /* Exceptions for "Features" folder in "New-Pol-Mure" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Authentication/Views/Untitled.swift,
-			);
-			target = 39F3727C2F878E51009A1CF2 /* New-Pol-Mure */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		398138462F920EA6009C4656 /* Core */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -57,9 +47,6 @@
 		};
 		398138792F9215D0009C4656 /* Features */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				398138992F922645009C4656 /* Exceptions for "Features" folder in "New-Pol-Mure" target */,
-			);
 			path = Features;
 			sourceTree = "<group>";
 		};
