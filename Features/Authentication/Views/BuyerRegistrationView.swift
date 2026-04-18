@@ -1,59 +1,44 @@
 
+
 import SwiftUI
 import MapKit
-import PhotosUI
 
 struct BuyerRegistrationView: View {
     @Environment(\.dismiss) var dismiss
-    
-    
     @State private var viewModel = BuyerRegistrationViewModel()
+    
+   
+    @State private var inlineCameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609),
+        latitudinalMeters: 5000,
+        longitudinalMeters: 5000
+    ))
     
     var body: some View {
         Form {
-            
+            // MARK: - Default Profile Image Display
             Section {
                 HStack {
                     Spacer()
-                    PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
-                        VStack(spacing: 8) {
-                            if let profileImage = viewModel.profileImage {
-                                profileImage
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 90, height: 90)
-                                    .clipShape(Circle())
-                                    .shadow(radius: 4)
-                            } else {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color(UIColor.secondarySystemBackground))
-                                        .frame(width: 90, height: 90)
-                                        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
-                                    
-                                    Image(systemName: "camera.fill")
-                                        .font(.title)
-                                        .foregroundColor(Color.polmureEmerald)
-                                }
-                            }
-                            Text("Add Logo / Photo")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .onChange(of: viewModel.selectedPhotoItem) { newItem in
-                        Task {
-                            await viewModel.loadPhoto(from: newItem)
-                        }
+                    VStack(spacing: 8) {
+                        Image("Gemini_Generated_Image_l5uvm3l5uvm3l5uv")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 90, height: 90)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                        
+                        Text("Default Profile Selected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                     Spacer()
                 }
-                .listRowBackground(Color.clear)
-                .padding(.top, 10)
-                .padding(.bottom, 4)
+                .padding(.vertical, 8)
             }
+            .listRowBackground(Color.clear)
             
-            // MARK: - ACCOUNT DETAILS
+            // MARK: - Account Details
             Section(header: Text("Account Details")) {
                 TextField("Full Name / Business Name", text: $viewModel.fullName)
                     .textContentType(.name)
@@ -71,96 +56,84 @@ struct BuyerRegistrationView: View {
                     .textContentType(.newPassword)
             }
             
-            // MARK: - BUSINESS PROFILE
+            // MARK: - Business Profile
             Section(header: Text("Business Profile")) {
                 Picker("Business Type", selection: $viewModel.businessType) {
-                    ForEach(viewModel.businessTypes, id: \.self) { type in
-                        Text(type).tag(type)
+                    ForEach(viewModel.businessTypes, id: \.self) {
+                        Text($0)
                     }
                 }
-                .tint(Color.polmureEmerald)
+                .tint(.green)
                 
                 if viewModel.businessType == "Other" {
-                    TextField("Please specify business type...", text: $viewModel.customBusinessType)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    TextField("Specify Business Type", text: $viewModel.customBusinessType)
                 }
                 
                 HStack {
                     Text("Typical Volume")
                     Spacer()
                     TextField("e.g. 5000", text: $viewModel.typicalVolume)
-                        .keyboardType(.decimalPad)
+                        .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
-                        .foregroundColor(Color.polmureEmerald)
-                        .bold()
+                        .frame(width: 100)
+                        .foregroundColor(.green)
                     
-                    Picker("Unit", selection: $viewModel.volumeUnit) {
-                        ForEach(viewModel.volumeUnits, id: \.self) { unit in
-                            Text(unit).tag(unit)
+                    Picker("", selection: $viewModel.volumeUnit) {
+                        ForEach(viewModel.volumeUnits, id: \.self) {
+                            Text($0)
                         }
                     }
-                    .pickerStyle(.menu)
-                    .tint(.secondary)
                     .labelsHidden()
                 }
             }
             
-            // MARK: - SOURCING LOCATION PREVIEW
+            // MARK: - Sourcing Location
             Section(header: Text("Sourcing Location")) {
-                Map(position: .constant(.region(MKCoordinateRegion(center: viewModel.buyerLocation, latitudinalMeters: 15000, longitudinalMeters: 15000))), interactionModes: []) {
-                    MapCircle(center: viewModel.buyerLocation, radius: 5000)
-                        .foregroundStyle(Color.blue.opacity(0.3))
-                        .stroke(Color.blue, lineWidth: 2)
+                ZStack {
+                    // Binding the Map to the dynamic inlineCameraPosition
+                    Map(position: $inlineCameraPosition, interactionModes: []) {
+                        MapCircle(center: viewModel.buyerLocation, radius: 2000)
+                            .foregroundStyle(.blue.opacity(0.3))
+                        Marker("Zone", coordinate: viewModel.buyerLocation)
+                            .tint(.blue)
+                    }
+                    .frame(height: 140)
+                    
+                    // Invisible button covering the map so tapping it opens the full screen
+                    Button(action: { viewModel.isFullScreenMapPresented = true }) {
+                        Color.clear
+                    }
                 }
-                .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.vertical, 8)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                
-                .overlay(alignment: .center) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.title)
-                        .foregroundColor(.blue)
-                        .background(Circle().fill(.white))
-                }
+                .listRowInsets(EdgeInsets())
                 .overlay(alignment: .topTrailing) {
-                    Button(action: {
-                        viewModel.isFullScreenMapPresented = true
-                    }) {
+                    // The clean white circular expand button
+                    Button(action: { viewModel.isFullScreenMapPresented = true }) {
                         Image(systemName: "arrow.up.backward.and.arrow.down.forward")
-                            .font(.caption.bold())
-                            .padding(10)
-                            .background(.thickMaterial)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.blue)
+                            .frame(width: 32, height: 32)
+                            .background(Color.white)
                             .clipShape(Circle())
                             .shadow(radius: 2)
                     }
                     .padding(12)
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
+                // The text sits perfectly in its own row below the map
                 HStack {
                     Text("Selected Zone:")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                     Spacer()
                     Text(viewModel.locationName)
-                        .fontWeight(.bold)
+                        .font(.subheadline.bold())
                         .foregroundColor(.primary)
                 }
-                .padding(.vertical, 4)
             }
-        }
-        .navigationTitle("Join as a Buyer")
-        .navigationBarTitleDisplayMode(.inline)
-        
-        .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
-           
-            BuyerFullScreenLocationPicker(
-                buyerLocation: $viewModel.buyerLocation,
-                locationName: $viewModel.locationName
-            )
-        }
-        
-        .safeAreaInset(edge: .bottom) {
-            VStack {
+            
+            
+            Section {
                 Button(action: {
                     viewModel.registerBuyer(onSuccess: {
                         dismiss()
@@ -170,24 +143,32 @@ struct BuyerRegistrationView: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
-                        .background(viewModel.isFormValid ? Color.polmureEmerald : Color(UIColor.systemGray4))
+                        .background(viewModel.isFormValid ? Color.green : Color(UIColor.systemGray4))
                         .foregroundColor(viewModel.isFormValid ? .white : Color(UIColor.systemGray))
                         .cornerRadius(14)
-                        .shadow(color: viewModel.isFormValid ? Color.polmureEmerald.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
                 }
                 .disabled(!viewModel.isFormValid)
-                .padding(.horizontal)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
-            .background(.regularMaterial)
         }
-        .animation(.easeInOut, value: viewModel.businessType)
+        .navigationTitle("Join as a Buyer")
+        .navigationBarTitleDisplayMode(.inline)
+       
+        .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
+            BuyerFullScreenLocationPicker(buyerLocation: $viewModel.buyerLocation, locationName: $viewModel.locationName)
+        }
+        // FIX 2: Watching 'locationName' so the app doesn't crash, and perfectly snapping the camera
+        .onChange(of: viewModel.locationName) { _, _ in
+            inlineCameraPosition = .region(MKCoordinateRegion(
+                center: viewModel.buyerLocation,
+                latitudinalMeters: 5000,
+                longitudinalMeters: 5000
+            ))
+        }
     }
 }
 
 #Preview {
-    NavigationStack {
-        BuyerRegistrationView()
-    }
+    BuyerRegistrationView()
 }

@@ -1,4 +1,5 @@
 
+
 import SwiftUI
 import MapKit
 
@@ -79,7 +80,6 @@ struct DiscoveryDashboardView: View {
                         .padding(.horizontal)
                         
                         VStack(spacing: 12) {
-                            
                             Map(position: .constant(.region(MKCoordinateRegion(center: viewModel.searchCenter, latitudinalMeters: viewModel.searchRadius * 2500, longitudinalMeters: viewModel.searchRadius * 2500))), interactionModes: []) {
                                 
                                 MapCircle(center: viewModel.searchCenter, radius: viewModel.searchRadius * 1000)
@@ -184,21 +184,59 @@ struct DiscoveryDashboardView: View {
                                 .foregroundColor(.blue)
                         }
                         
-                        // 2. Profile Action
+                        // 2. Profile Action (Loads from Xcode Assets)
                         Button(action: { viewModel.showProfile = true }) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.blue)
+                            Image(viewModel.profileImageName)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 32, height: 32)
+                                .clipShape(Circle())
                         }
                     }
                 }
             }
+            // MARK: - Profile / Developer Sheet
             .sheet(isPresented: $viewModel.showProfile) {
                 NavigationStack {
-                    Text("Profile View Placeholder")
-                        .navigationTitle("Profile")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { viewModel.showProfile = false } } }
+                    VStack(spacing: 24) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        
+                        Text("Developer Options")
+                            .font(.title2.bold())
+                        
+                        Text("Use these tools during testing to clear your cache and database connections.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                        
+                        Button(action: {
+                            AuthManager.shared.signOut()
+                            viewModel.showProfile = false
+                        }) {
+                            Text("Log Out (Clear Session)")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red)
+                                .cornerRadius(12)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 40)
+                    .navigationTitle("Profile")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { viewModel.showProfile = false }
+                        }
+                    }
                 }
             }
             .sheet(isPresented: $viewModel.showNotifications) {

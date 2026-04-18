@@ -13,18 +13,19 @@ class AuthViewModel {
     
     // MARK: - Email/Password Login (Firebase + Core Data)
     func signInWithEmail(completion: @escaping (Bool, String, String) -> Void) {
+        
+        // THE FIX: Strip out invisible trailing spaces added by the iOS keyboard
+        let safeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        
         Task {
             do {
-                // 1. Pass credentials to the Hybrid Data Manager
-                // This checks Firebase Auth, gets the user's role from Firestore, and saves to Core Data
-                let role = try await AuthManager.shared.loginUser(email: email, password: password)
+                // Pass the cleaned credentials to the Hybrid Data Manager
+                let role = try await AuthManager.shared.loginUser(email: safeEmail, password: password)
                 
-                // 2. Return success and the user's role to the View to trigger navigation
                 DispatchQueue.main.async {
                     completion(true, role, "")
                 }
             } catch {
-                // 3. Return the exact Firebase error (e.g., "Wrong password") to display in the UI
                 DispatchQueue.main.async {
                     completion(false, "", error.localizedDescription)
                 }
