@@ -1,4 +1,5 @@
 
+
 import SwiftUI
 import MapKit
 import PhotosUI
@@ -61,9 +62,29 @@ class BuyerRegistrationViewModel {
         }
     }
     
-    func registerBuyer() {
-        // Firebase registration logic will be injected here next
-        print("Registering Buyer...")
+    // MARK: - Updated Registration Trigger
+    func registerBuyer(onSuccess: @escaping () -> Void) {
+        Task {
+            do {
+                // 1. Pass the data to our Hybrid Data Manager
+                try await AuthManager.shared.registerBuyer(
+                    email: email,
+                    password: password,
+                    fullName: fullName,
+                    volume: typicalVolume,
+                    locationName: locationName
+                )
+                
+                // 2. If successful, trigger the closure to update the UI
+                DispatchQueue.main.async {
+                    onSuccess()
+                }
+            } catch {
+                // 3. Catch Firebase errors (e.g., email already in use)
+                print("Registration Error: \(error.localizedDescription)")
+                // Note: For full production polish, you can add an `errorMessage` string
+                // to this ViewModel and display it in the view if this fails.
+            }
+        }
     }
 }
-

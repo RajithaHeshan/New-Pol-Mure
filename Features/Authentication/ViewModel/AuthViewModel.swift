@@ -1,4 +1,3 @@
-// Location: New-Pol-Mure/Features/Authentication/ViewModels/AuthViewModel.swift
 
 import SwiftUI
 import LocalAuthentication
@@ -6,13 +5,34 @@ import LocalAuthentication
 @Observable
 @MainActor
 class AuthViewModel {
-    // With @Observable, standard variables automatically update the UI. No @Published needed.
+    // State Variables for the UI
     var email = ""
     var password = ""
     var errorMessage = ""
     var demoRoleSelection = "Buyer"
     
-    // Extracted Face ID Logic
+    // MARK: - Email/Password Login (Firebase + Core Data)
+    func signInWithEmail(completion: @escaping (Bool, String, String) -> Void) {
+        Task {
+            do {
+                // 1. Pass credentials to the Hybrid Data Manager
+                // This checks Firebase Auth, gets the user's role from Firestore, and saves to Core Data
+                let role = try await AuthManager.shared.loginUser(email: email, password: password)
+                
+                // 2. Return success and the user's role to the View to trigger navigation
+                DispatchQueue.main.async {
+                    completion(true, role, "")
+                }
+            } catch {
+                // 3. Return the exact Firebase error (e.g., "Wrong password") to display in the UI
+                DispatchQueue.main.async {
+                    completion(false, "", error.localizedDescription)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Face ID Logic
     func authenticateWithFaceID(completion: @escaping (Bool, String) -> Void) {
         let context = LAContext()
         var error: NSError?

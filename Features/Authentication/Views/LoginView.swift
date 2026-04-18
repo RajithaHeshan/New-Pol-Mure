@@ -1,34 +1,27 @@
-
-
 import SwiftUI
 import AuthenticationServices
 
 struct LoginView: View {
-    // Connect to our new ViewModel
     @State private var viewModel = AuthViewModel()
-    // Global App State
+    
     @AppStorage("isLoggedIn") var isLoggedIn: Bool = false
     @AppStorage("userRole") var userRole: String = ""
     
     @FocusState private var focusedField: Field?
     enum Field { case email, password }
     
+    // New State for Registration Navigation
+    @State private var showRegistration = false
+    
     var body: some View {
         NavigationStack {
             ZStack {
-                LinearGradient(
-                    colors: [Color.polmureEmerald.opacity(0.15), Color(UIColor.systemBackground)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ).ignoresSafeArea()
+                LinearGradient(colors: [Color.polmureEmerald.opacity(0.15), Color(UIColor.systemBackground)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 32) {
-                        
-                        // 1. Use Reusable Component
                         PolmureHeaderView()
                         
-                        // 2. Input Fields
                         VStack(spacing: 16) {
                             HStack {
                                 Image(systemName: "envelope.fill").foregroundColor(.secondary).frame(width: 24)
@@ -38,10 +31,7 @@ struct LoginView: View {
                                     .textInputAutocapitalization(.never)
                                     .focused($focusedField, equals: .email)
                             }
-                            .padding()
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(14)
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.1), lineWidth: 1))
+                            .padding().background(Color(UIColor.secondarySystemBackground)).cornerRadius(14)
                             
                             HStack {
                                 Image(systemName: "lock.fill").foregroundColor(.secondary).frame(width: 24)
@@ -49,32 +39,27 @@ struct LoginView: View {
                                     .textContentType(.password)
                                     .focused($focusedField, equals: .password)
                             }
-                            .padding()
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(14)
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.gray.opacity(0.1), lineWidth: 1))
-                            
-                            HStack {
-                                Spacer()
-                                Button("Forgot Password?") { }
-                                    .font(.caption.bold())
-                                    .foregroundColor(.polmureEmerald)
-                            }
+                            .padding().background(Color(UIColor.secondarySystemBackground)).cornerRadius(14)
                         }
                         .padding(.horizontal, 24)
                         
-                        // 3. Action Buttons
                         VStack(spacing: 16) {
-                            // Use Reusable Component
+                            
+                            // MARK: Updated Sign In Button
                             PrimaryButton(title: "Sign In") {
                                 focusedField = nil
-                                // Add Firebase email login logic here later
+                                viewModel.signInWithEmail { success, role, errorMsg in
+                                    if success {
+                                        self.userRole = role
+                                        self.isLoggedIn = true
+                                    } else {
+                                        viewModel.errorMessage = errorMsg
+                                    }
+                                }
                             }
                             
-                            // Simulator Role Toggle
                             VStack(spacing: 8) {
-                                Text("Simulator Routing (Dev Only)")
-                                    .font(.caption2).foregroundColor(.secondary)
+                                Text("Simulator Routing (Dev Only)").font(.caption2).foregroundColor(.secondary)
                                 Picker("Simulate Role", selection: $viewModel.demoRoleSelection) {
                                     Text("Buyer Demo").tag("Buyer")
                                     Text("Seller Demo").tag("Seller")
@@ -82,61 +67,43 @@ struct LoginView: View {
                                 .pickerStyle(SegmentedPickerStyle())
                             }.padding(.top, 8)
                             
-                            // Face ID Button using ViewModel
-                            Button(action: {
-                                viewModel.authenticateWithFaceID { success, errorMsg in
-                                    if success {
-                                        self.userRole = viewModel.demoRoleSelection
-                                        self.isLoggedIn = true
-                                    } else {
-                                        viewModel.errorMessage = errorMsg
-                                    }
-                                }
-                            }) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "faceid").font(.title3)
-                                    Text("Sign in with Face ID").font(.headline)
-                                }
-                                .foregroundColor(.polmureEmerald)
-                                .frame(maxWidth: .infinity, maxHeight: 54)
-                                .background(Color.polmureEmerald.opacity(0.1))
-                                .cornerRadius(14)
-                            }
-                            
                             if !viewModel.errorMessage.isEmpty {
                                 Text(viewModel.errorMessage).font(.caption).foregroundColor(.red)
                             }
-                            
-                            HStack {
-                                VStack { Divider() }
-                                Text("OR").font(.caption).foregroundColor(.secondary).padding(.horizontal, 8)
-                                VStack { Divider() }
-                            }.padding(.vertical, 8)
-                            
-                            SignInWithAppleButton(.signIn, onRequest: { request in
-                                request.requestedScopes = [.fullName, .email]
-                            }, onCompletion: { _ in })
-                            .signInWithAppleButtonStyle(.black)
-                            .frame(height: 54)
-                            .cornerRadius(14)
                         }
                         .padding(.horizontal, 24)
                         
                         Spacer(minLength: 40)
                         
+                        // MARK: Updated Registration Routing
                         HStack(spacing: 4) {
                             Text("Don't have an account?").foregroundColor(.secondary).font(.subheadline)
-                            Button("Register Now") { }.font(.subheadline.bold()).foregroundColor(.polmureEmerald)
-                        }.padding(.bottom, 20)
+                            Button("Register Now") {
+                                showRegistration = true
+                            }
+                            .font(.subheadline.bold())
+                            .foregroundColor(.polmureEmerald)
+                        }
+                        .padding(.bottom, 20)
                     }
                 }
-                .onTapGesture { focusedField = nil }
+            }
+            // MARK: Navigation Routing
+            .navigationDestination(isPresented: $showRegistration) {
+                if viewModel.demoRoleSelection == "Buyer" {
+                    // Note: Ensure you update BuyerRegistrationView's button to call viewModel.registerBuyer { dismiss() }
+                    BuyerRegistrationView()
+                } else {
+                    SellerRegistrationView()
+                }
             }
             .navigationDestination(isPresented: $isLoggedIn) {
-                if userRole == "Buyer" {
-                    Text("Welcome to the Buyer Discovery Dashboard").navigationBarBackButtonHidden(true)
-                } else if userRole == "Seller" {
-                    Text("Welcome to the Seller Activity Dashboard").navigationBarBackButtonHidden(true)
+                if userRole == "BUYER" || userRole == "Buyer" {
+                    DiscoveryDashboardView()
+                        .navigationBarBackButtonHidden(true)
+                } else {
+                    SellerDashboardView()
+                        .navigationBarBackButtonHidden(true)
                 }
             }
         }

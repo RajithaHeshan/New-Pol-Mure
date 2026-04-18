@@ -162,7 +162,9 @@ struct BuyerRegistrationView: View {
         .safeAreaInset(edge: .bottom) {
             VStack {
                 Button(action: {
-                    viewModel.registerBuyer()
+                    viewModel.registerBuyer(onSuccess: {
+                        dismiss()
+                    })
                 }) {
                     Text("Create Buyer Account")
                         .font(.headline)
