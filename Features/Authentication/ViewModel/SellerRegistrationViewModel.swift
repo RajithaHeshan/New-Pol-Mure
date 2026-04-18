@@ -1,78 +1,63 @@
 
-// Location: New-Pol-Mure/Features/Authentication/ViewModels/SellerRegistrationViewModel.swift
 
 import SwiftUI
 import MapKit
-import PhotosUI
 
 @Observable
 @MainActor
 class SellerRegistrationViewModel {
-    // Owner Details
+    // MARK: - Owner Details
     var fullName = ""
     var email = ""
     var phone = ""
     var password = ""
     
-    // Profile Image
-    var selectedPhotoItem: PhotosPickerItem? = nil
-    var profileImage: Image? = nil
     
-    // Production Cycle
     var yieldPerHarvest = ""
-    var harvestDuration: Int = 45
+    var harvestCycle = "Every 45 Days"
     var nextHarvestDate = Date()
     
-    // Quality & Verification
-    var certification = "Standard (Local Market)"
-    var selectedCertItem: PhotosPickerItem? = nil
-    var certImage: Image? = nil
+  
+    var certificationLevel = "Standard (Local Market)"
+    let certificationLevels = ["Standard (Local Market)", "Export Quality", "Organic Certified", "GAP Certified"]
     
-    // Map State
+    // MARK: - Estate Location State
     var estateLocation = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
     var locationName = "Kurunegala"
     var isFullScreenMapPresented = false
     
-    // Constants
-    let certifications = [
-        "Standard (Local Market)",
-        "Premium (Export Grade)",
-        "Certified Organic",
-        "GAP Certified"
-    ]
-    
-    // Validation Logic
+    // MARK: - Validation
     var isFormValid: Bool {
-        let isBaseValid = !fullName.isEmpty &&
-                          !email.isEmpty && email.contains("@") &&
-                          !phone.isEmpty &&
-                          !password.isEmpty && password.count >= 6 &&
-                          !yieldPerHarvest.isEmpty
+        return !fullName.isEmpty &&
+               !email.isEmpty && email.contains("@") &&
+               !phone.isEmpty &&
+               password.count >= 6 &&
+               !yieldPerHarvest.isEmpty
+    }
+    
+    // MARK: - Registration Trigger
+    func registerSeller(onSuccess: @escaping () -> Void) {
+        // Strip trailing spaces from email
+        let safeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // If they select a premium cert, they MUST upload an image for the button to turn Orange
-        if certification != "Standard (Local Market)" {
-            return isBaseValid && certImage != nil
+        Task {
+            do {
+                try await AuthManager.shared.registerSeller(
+                    email: safeEmail,
+                    password: password,
+                    fullName: fullName,
+                    phone: phone,
+                    yield: yieldPerHarvest,
+                    cycle: harvestCycle,
+                    nextHarvestDate: nextHarvestDate,
+                    certification: certificationLevel,
+                    locationName: locationName
+                )
+                
+                DispatchQueue.main.async { onSuccess() }
+            } catch {
+                print("Seller Registration Error: \(error.localizedDescription)")
+            }
         }
-        return isBaseValid
-    }
-    
-    // Photo Processing Handlers
-    func loadProfilePhoto(from item: PhotosPickerItem?) async {
-        if let data = try? await item?.loadTransferable(type: Data.self),
-           let uiImage = UIImage(data: data) {
-            self.profileImage = Image(uiImage: uiImage)
-        }
-    }
-    
-    func loadCertPhoto(from item: PhotosPickerItem?) async {
-        if let data = try? await item?.loadTransferable(type: Data.self),
-           let uiImage = UIImage(data: data) {
-            self.certImage = Image(uiImage: uiImage)
-        }
-    }
-    
-    func registerSeller() {
-        // Firebase registration logic will be injected here next
-        print("Registering Seller...")
     }
 }

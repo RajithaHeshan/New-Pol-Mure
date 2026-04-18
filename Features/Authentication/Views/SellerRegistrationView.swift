@@ -1,70 +1,41 @@
-
 import SwiftUI
 import MapKit
-import PhotosUI
 
 struct SellerRegistrationView: View {
     @Environment(\.dismiss) var dismiss
-    
-    // Connect to the ViewModel
     @State private var viewModel = SellerRegistrationViewModel()
+    
+    // Dynamic camera state for the inline map
+    @State private var inlineCameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609),
+        latitudinalMeters: 5000,
+        longitudinalMeters: 5000
+    ))
     
     var body: some View {
         Form {
-            // MARK: - HEADER & PHOTO
+            // MARK: - Header & Default Estate Image
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Register Your Estate")
-                        .font(.title2.bold())
-                        .foregroundColor(Color.polmureEmerald)
-                    Text("List your coconut harvest and connect directly with high-volume buyers.")
-                        .font(.subheadline)
+                VStack(spacing: 8) {
+                    HStack {
+                        Spacer()
+                        Image("Gemini_Generated_Image_bvc5lzbvc5lzbvc5")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 90, height: 90)
+                            .clipShape(Circle())
+                            .shadow(radius: 4)
+                        Spacer()
+                    }
+                    Text("Default Estate Photo Selected")
+                        .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 8)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets())
-                
-                HStack {
-                    Spacer()
-                    PhotosPicker(selection: $viewModel.selectedPhotoItem, matching: .images, photoLibrary: .shared()) {
-                        VStack(spacing: 8) {
-                            if let profileImage = viewModel.profileImage {
-                                profileImage
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 90, height: 90)
-                                    .clipShape(Circle())
-                                    .shadow(radius: 4)
-                            } else {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color(UIColor.secondarySystemBackground))
-                                        .frame(width: 90, height: 90)
-                                        .shadow(color: .black.opacity(0.05), radius: 5, y: 2)
-                                    
-                                    Image(systemName: "tree.fill")
-                                        .font(.title)
-                                        .foregroundColor(Color.orange)
-                                }
-                            }
-                            Text("Add Estate Photo")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    .onChange(of: viewModel.selectedPhotoItem) { newItem in
-                        Task {
-                            await viewModel.loadProfilePhoto(from: newItem)
-                        }
-                    }
-                    Spacer()
-                }
-                .listRowBackground(Color.clear)
-                .padding(.bottom, 4)
             }
+            .listRowBackground(Color.clear)
             
-            // MARK: - ACCOUNT DETAILS
+            // MARK: - Owner Details
             Section(header: Text("Owner Details")) {
                 TextField("Full Name", text: $viewModel.fullName)
                     .textContentType(.name)
@@ -82,169 +53,119 @@ struct SellerRegistrationView: View {
                     .textContentType(.newPassword)
             }
             
-            // MARK: - ESTATE PRODUCTION PROFILE
-            Section(
-                header: Text("Production Cycle"),
-                footer: Text("This data helps buyers secure contracts for your future harvests.")
-            ) {
+            // MARK: - Production Cycle
+            Section(header: Text("Production Cycle")) {
                 HStack {
                     Text("Yield Per Harvest")
                     Spacer()
                     TextField("e.g. 10000", text: $viewModel.yieldPerHarvest)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
-                        .foregroundColor(Color.polmureEmerald)
-                        .bold()
+                        .frame(width: 100)
+                        .foregroundColor(.green)
                     Text("Nuts")
                         .foregroundColor(.secondary)
                 }
                 
-                Stepper(value: $viewModel.harvestDuration, in: 45...120) {
-                    HStack {
-                        Text("Harvest Cycle")
-                        Spacer()
-                        Text("Every \(viewModel.harvestDuration) Days")
-                            .foregroundColor(Color.orange)
-                            .bold()
-                    }
+                HStack {
+                    Text("Harvest Cycle")
+                    Spacer()
+                    Text(viewModel.harvestCycle)
+                        .foregroundColor(.secondary)
                 }
                 
-                DatePicker("Next Harvest Date", selection: $viewModel.nextHarvestDate, in: Date()..., displayedComponents: .date)
-                    .tint(Color.orange)
+                DatePicker("Next Harvest Date", selection: $viewModel.nextHarvestDate, displayedComponents: .date)
             }
             
-            // MARK: - QUALITY & VERIFICATION
-            Section(
-                header: Text("Quality & Verification"),
-                footer: Text("Verified certificates allow you to charge premium prices on the marketplace.")
-            ) {
-                Picker("Certification Level", selection: $viewModel.certification) {
-                    ForEach(viewModel.certifications, id: \.self) { cert in
-                        Text(cert).tag(cert)
+            // MARK: - Quality & Verification
+            Section(header: Text("Quality & Verification")) {
+                Picker("Certification Level", selection: $viewModel.certificationLevel) {
+                    ForEach(viewModel.certificationLevels, id: \.self) {
+                        Text($0)
                     }
                 }
-                .tint(Color.polmureEmerald)
-                
-                if viewModel.certification != "Standard (Local Market)" {
-                    PhotosPicker(selection: $viewModel.selectedCertItem, matching: .images, photoLibrary: .shared()) {
-                        HStack {
-                            Image(systemName: "doc.text.viewfinder")
-                                .font(.title2)
-                                .foregroundColor(viewModel.certImage != nil ? .green : .orange)
-                            
-                            VStack(alignment: .leading) {
-                                Text(viewModel.certImage != nil ? "Document Uploaded" : "Upload Official Certificate")
-                                    .font(.headline)
-                                    .foregroundColor(viewModel.certImage != nil ? .primary : .orange)
-                                Text(viewModel.certImage != nil ? "Tap to change photo" : "Required for verification")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            
-                            if let certImage = viewModel.certImage {
-                                certImage
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .transition(.opacity.combined(with: .scale))
-                    .onChange(of: viewModel.selectedCertItem) { newItem in
-                        Task {
-                            await viewModel.loadCertPhoto(from: newItem)
-                        }
-                    }
-                }
+                .tint(.green)
             }
             
-            // MARK: - PRECISE MAP LOCATION
-            Section(
-                header: Text("Estate Location"),
-                footer: Text("Privacy Protected: Buyers will only see this 5km fuzzy zone. Your exact estate location is locked until Escrow is secured.")
-            ) {
-                Map(position: .constant(.region(MKCoordinateRegion(center: viewModel.estateLocation, latitudinalMeters: 15000, longitudinalMeters: 15000))), interactionModes: []) {
-                    MapCircle(center: viewModel.estateLocation, radius: 5000)
-                        .foregroundStyle(Color.orange.opacity(0.3))
-                        .stroke(Color.orange, lineWidth: 2)
+            // MARK: - Estate Location (Perfect Edge-to-Edge Map UI)
+            Section(header: Text("Estate Location")) {
+                ZStack {
+                    Map(position: $inlineCameraPosition, interactionModes: []) {
+                        MapCircle(center: viewModel.estateLocation, radius: 2000)
+                            .foregroundStyle(.orange.opacity(0.3))
+                        Marker("Estate", coordinate: viewModel.estateLocation)
+                            .tint(.orange)
+                    }
+                    .frame(height: 140)
+                    
+                    // Invisible button for tap detection
+                    Button(action: { viewModel.isFullScreenMapPresented = true }) {
+                        Color.clear
+                    }
                 }
-                .frame(height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.vertical, 8)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                
-                .overlay(alignment: .center) {
-                    Image(systemName: "mappin.circle.fill")
-                        .font(.title)
-                        .foregroundColor(.orange)
-                        .background(Circle().fill(.white))
-                }
+                .listRowInsets(EdgeInsets())
                 .overlay(alignment: .topTrailing) {
-                    Button(action: {
-                        viewModel.isFullScreenMapPresented = true
-                    }) {
+                    Button(action: { viewModel.isFullScreenMapPresented = true }) {
                         Image(systemName: "arrow.up.backward.and.arrow.down.forward")
-                            .font(.caption.bold())
-                            .padding(10)
-                            .background(.thickMaterial)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.orange)
+                            .frame(width: 32, height: 32)
+                            .background(Color.white)
                             .clipShape(Circle())
                             .shadow(radius: 2)
                     }
                     .padding(12)
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
                 HStack {
                     Text("Selected Zone:")
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                     Spacer()
                     Text(viewModel.locationName)
-                        .fontWeight(.bold)
+                        .font(.subheadline.bold())
                         .foregroundColor(.primary)
                 }
-                .padding(.vertical, 4)
             }
-        }
-        .navigationTitle("Join as a Seller")
-        .navigationBarTitleDisplayMode(.inline)
-        .animation(.easeInOut, value: viewModel.certification)
-        
-        .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
-            EstateLocationMapScreen(
-                estateLocation: $viewModel.estateLocation,
-                locationName: $viewModel.locationName
-            )
-        }
-        
-        .safeAreaInset(edge: .bottom) {
-            VStack {
+            
+            // MARK: - Submit Button
+            Section {
                 Button(action: {
-                    viewModel.registerSeller()
+                    viewModel.registerSeller {
+                        dismiss()
+                    }
                 }) {
                     Text("Create Seller Account")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
-                        .background(viewModel.isFormValid ? Color.orange : Color(UIColor.systemGray4))
-                        .foregroundColor(viewModel.isFormValid ? .white : Color(UIColor.systemGray))
+                        .background(viewModel.isFormValid ? Color(UIColor.systemGray4) : Color(UIColor.systemGray5))
+                        .foregroundColor(viewModel.isFormValid ? .primary : Color(UIColor.systemGray))
                         .cornerRadius(14)
-                        .shadow(color: viewModel.isFormValid ? Color.orange.opacity(0.3) : .clear, radius: 8, x: 0, y: 4)
                 }
                 .disabled(!viewModel.isFormValid)
-                .padding(.horizontal)
-                .padding(.top, 16)
-                .padding(.bottom, 8)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
-            .background(.regularMaterial)
+        }
+        .navigationTitle("Join as a Seller")
+        .navigationBarTitleDisplayMode(.inline)
+        // MARK: Using your perfectly working EstateLocationMapScreen!
+        .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
+            EstateLocationMapScreen(estateLocation: $viewModel.estateLocation, locationName: $viewModel.locationName)
+        }
+        // Safely updates the inline map without crashing
+        .onChange(of: viewModel.locationName) { _, _ in
+            inlineCameraPosition = .region(MKCoordinateRegion(
+                center: viewModel.estateLocation,
+                latitudinalMeters: 5000,
+                longitudinalMeters: 5000
+            ))
         }
     }
 }
 
 #Preview {
-    NavigationStack {
-        SellerRegistrationView()
-    }
+    SellerRegistrationView()
 }
-
