@@ -16,7 +16,7 @@ struct BuyerRegistrationView: View {
     
     var body: some View {
         Form {
-            // MARK: - Default Profile Image Display
+           
             Section {
                 HStack {
                     Spacer()
@@ -38,7 +38,7 @@ struct BuyerRegistrationView: View {
             }
             .listRowBackground(Color.clear)
             
-            // MARK: - Account Details
+          
             Section(header: Text("Account Details")) {
                 TextField("Full Name / Business Name", text: $viewModel.fullName)
                     .textContentType(.name)
@@ -56,7 +56,7 @@ struct BuyerRegistrationView: View {
                     .textContentType(.newPassword)
             }
             
-            // MARK: - Business Profile
+           
             Section(header: Text("Business Profile")) {
                 Picker("Business Type", selection: $viewModel.businessType) {
                     ForEach(viewModel.businessTypes, id: \.self) {
@@ -87,10 +87,10 @@ struct BuyerRegistrationView: View {
                 }
             }
             
-            // MARK: - Sourcing Location
+           
             Section(header: Text("Sourcing Location")) {
                 ZStack {
-                    // Binding the Map to the dynamic inlineCameraPosition
+                   
                     Map(position: $inlineCameraPosition, interactionModes: []) {
                         MapCircle(center: viewModel.buyerLocation, radius: 2000)
                             .foregroundStyle(.blue.opacity(0.3))
@@ -99,14 +99,14 @@ struct BuyerRegistrationView: View {
                     }
                     .frame(height: 140)
                     
-                    // Invisible button covering the map so tapping it opens the full screen
+                  
                     Button(action: { viewModel.isFullScreenMapPresented = true }) {
                         Color.clear
                     }
                 }
                 .listRowInsets(EdgeInsets())
                 .overlay(alignment: .topTrailing) {
-                    // The clean white circular expand button
+                   
                     Button(action: { viewModel.isFullScreenMapPresented = true }) {
                         Image(systemName: "arrow.up.backward.and.arrow.down.forward")
                             .font(.system(size: 14, weight: .bold))
@@ -120,7 +120,7 @@ struct BuyerRegistrationView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 
-                // The text sits perfectly in its own row below the map
+               
                 HStack {
                     Text("Selected Zone:")
                         .font(.subheadline)
@@ -158,7 +158,7 @@ struct BuyerRegistrationView: View {
         .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
             BuyerFullScreenLocationPicker(buyerLocation: $viewModel.buyerLocation, locationName: $viewModel.locationName)
         }
-        // FIX 2: Watching 'locationName' so the app doesn't crash, and perfectly snapping the camera
+       
         .onChange(of: viewModel.locationName) { _, _ in
             inlineCameraPosition = .region(MKCoordinateRegion(
                 center: viewModel.buyerLocation,

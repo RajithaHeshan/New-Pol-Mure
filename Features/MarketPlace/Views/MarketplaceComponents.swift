@@ -6,7 +6,7 @@ import MapKit
 struct FilterChipsView: View {
     let filters: [String]
     @Binding var selectedFilter: String
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -26,32 +26,42 @@ struct FilterChipsView: View {
     }
 }
 
-struct RecommendedLotCard: View {
-    let lot: HarvestLot
+// MARK: - Recommended Seller Card (Horizontal Scroll)
+struct RecommendedSellerCard: View {
+    let seller: SellerLocation
+
     var body: some View {
         VStack(alignment: .leading) {
             Map(interactionModes: []) {
-                MapCircle(center: lot.coordinate, radius: 4000)
+                MapCircle(center: seller.coordinate, radius: 4000)
                     .foregroundStyle(.blue.opacity(0.3))
+                Annotation(seller.sellerName, coordinate: seller.coordinate) {
+                    Image(systemName: "leaf.fill")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.green)
+                        .clipShape(Circle())
+                }
             }
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            
+
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(lot.quantity) Nuts")
+                Text(seller.sellerName)
                     .font(.headline)
                     .foregroundColor(.primary)
-                Text(lot.locationName)
+                Text(seller.locationName)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
                 HStack {
-                    Text("Top Bid: Rs \(lot.currentBid, specifier: "%.2f")")
+                    Text("Yield: \(seller.typicalYield) Nuts")
                         .font(.subheadline.bold())
                         .foregroundColor(.green)
                     Spacer()
-                    Image(systemName: "timer")
-                        .foregroundColor(.red)
+                    Image(systemName: "calendar")
+                        .foregroundColor(.orange)
                 }
                 .padding(.top, 4)
             }
@@ -65,41 +75,42 @@ struct RecommendedLotCard: View {
     }
 }
 
-struct GeneralAuctionRow: View {
-    let lot: HarvestLot
+// MARK: - Seller Row (Vertical List)
+struct SellerRow: View {
+    let seller: SellerLocation
+
     var body: some View {
         HStack {
             Image(systemName: "person.circle.fill")
                 .resizable()
                 .frame(width: 40, height: 40)
                 .foregroundColor(.gray.opacity(0.5))
-            
+
             VStack(alignment: .leading, spacing: 4) {
-                Text(lot.sellerInitial)
+                Text(seller.sellerName)
                     .font(.subheadline.bold())
-                Text("\(lot.quantity) Coconuts")
+                Text("\(seller.typicalYield) Coconuts")
                     .font(.headline)
-                Text(lot.locationName)
+                Text(seller.locationName)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .padding(.leading, 4)
             Spacer()
-            
+
             VStack(alignment: .trailing, spacing: 6) {
-                Text("Rs \(lot.currentBid, specifier: "%.2f")")
-                    .font(.title3.bold())
-                    .foregroundColor(.green)
-                
-                NavigationLink(destination: LiveBiddingView(lot: lot)) {
-                    Text("View Bid")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                }
+                Text(seller.certificationLevel)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.trailing)
+
+                Text("View")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
             }
         }
         .padding()

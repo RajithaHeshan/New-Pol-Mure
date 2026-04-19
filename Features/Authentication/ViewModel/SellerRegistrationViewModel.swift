@@ -1,12 +1,10 @@
-
-
 import SwiftUI
 import MapKit
 
 @Observable
 @MainActor
 class SellerRegistrationViewModel {
-    // MARK: - Owner Details
+   
     var fullName = ""
     var email = ""
     var phone = ""
@@ -21,12 +19,12 @@ class SellerRegistrationViewModel {
     var certificationLevel = "Standard (Local Market)"
     let certificationLevels = ["Standard (Local Market)", "Export Quality", "Organic Certified", "GAP Certified"]
     
-    // MARK: - Estate Location State
+
     var estateLocation = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
     var locationName = "Kurunegala"
     var isFullScreenMapPresented = false
     
-    // MARK: - Validation
+   
     var isFormValid: Bool {
         return !fullName.isEmpty &&
                !email.isEmpty && email.contains("@") &&
@@ -35,11 +33,11 @@ class SellerRegistrationViewModel {
                !yieldPerHarvest.isEmpty
     }
     
-    // MARK: - Registration Trigger
+   
     func registerSeller(onSuccess: @escaping () -> Void) {
-        // Strip trailing spaces from email
+      
         let safeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+
         Task {
             do {
                 try await AuthManager.shared.registerSeller(
@@ -51,9 +49,11 @@ class SellerRegistrationViewModel {
                     cycle: harvestCycle,
                     nextHarvestDate: nextHarvestDate,
                     certification: certificationLevel,
-                    locationName: locationName
+                    locationName: locationName,
+                    latitude: estateLocation.latitude,
+                    longitude: estateLocation.longitude
                 )
-                
+
                 DispatchQueue.main.async { onSuccess() }
             } catch {
                 print("Seller Registration Error: \(error.localizedDescription)")
@@ -61,3 +61,4 @@ class SellerRegistrationViewModel {
         }
     }
 }
+

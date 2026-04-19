@@ -6,44 +6,45 @@ import MapKit
 struct FullScreenLocationPicker: View {
     @Binding var searchCenter: CLLocationCoordinate2D
     @Binding var searchRadius: Double
-    let lots: [HarvestLot]
-    
+    let sellers: [SellerLocation]
+
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var cameraPosition: MapCameraPosition
     @State private var searchQuery: String = ""
     @State private var isSearching: Bool = false
     @State private var currentZoomSpan: Double
-    
-    init(searchCenter: Binding<CLLocationCoordinate2D>, searchRadius: Binding<Double>, lots: [HarvestLot]) {
+
+    init(searchCenter: Binding<CLLocationCoordinate2D>, searchRadius: Binding<Double>, sellers: [SellerLocation]) {
         self._searchCenter = searchCenter
         self._searchRadius = searchRadius
-        self.lots = lots
-        
+        self.sellers = sellers
+
         let initialSpan = searchRadius.wrappedValue * 3000
         self._currentZoomSpan = State(initialValue: initialSpan)
         self._cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: searchCenter.wrappedValue, latitudinalMeters: initialSpan, longitudinalMeters: initialSpan)))
     }
-    
-    var activeLots: [HarvestLot] {
+
+    // Only show sellers within the current search radius
+    var activeSellers: [SellerLocation] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
-        return lots.filter { lot in
-            let lotLocation = CLLocation(latitude: lot.coordinate.latitude, longitude: lot.coordinate.longitude)
-            return (lotLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
+        return sellers.filter { seller in
+            let sellerLocation = CLLocation(latitude: seller.coordinate.latitude, longitude: seller.coordinate.longitude)
+            return (sellerLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
         }
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
-                
+
                 Map(position: $cameraPosition) {
                     MapCircle(center: searchCenter, radius: searchRadius * 1000)
                         .foregroundStyle(.blue.opacity(0.3))
                         .stroke(.blue, lineWidth: 2)
-                    
-                    ForEach(activeLots) { lot in
-                        Annotation("\(lot.quantity) Nuts", coordinate: lot.coordinate) {
+
+                    ForEach(activeSellers) { seller in
+                        Annotation(seller.sellerName, coordinate: seller.coordinate) {
                             VStack {
                                 Image(systemName: "leaf.fill")
                                     .font(.headline)
@@ -63,7 +64,7 @@ struct FullScreenLocationPicker: View {
                     currentZoomSpan = context.region.span.latitudeDelta * 111000
                 }
                 .ignoresSafeArea()
-                
+
                 VStack {
                     Image(systemName: "mappin.circle.fill")
                         .font(.system(size: 36))
@@ -74,7 +75,7 @@ struct FullScreenLocationPicker: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 .allowsHitTesting(false)
-                
+
                 VStack {
                     HStack {
                         Image(systemName: "magnifyingglass")
@@ -82,7 +83,7 @@ struct FullScreenLocationPicker: View {
                         TextField("Search for a town (e.g. Kurunegala)", text: $searchQuery)
                             .submitLabel(.search)
                             .onSubmit { performSearch() }
-                        
+
                         if isSearching {
                             ProgressView().scaleEffect(0.8)
                         } else if !searchQuery.isEmpty {
@@ -99,7 +100,7 @@ struct FullScreenLocationPicker: View {
                     .padding(.top, 10)
                     Spacer()
                 }
-                
+
                 VStack {
                     Spacer()
                     VStack(spacing: 0) {
@@ -117,7 +118,7 @@ struct FullScreenLocationPicker: View {
                     .padding(.bottom, 180)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
-                
+
                 VStack(spacing: 16) {
                     HStack {
                         Image(systemName: "hand.draw.fill").foregroundColor(.blue)
@@ -146,7 +147,7 @@ struct FullScreenLocationPicker: View {
             }
         }
     }
-    
+
     private func performSearch() {
         guard !searchQuery.isEmpty else { return }
         isSearching = true
@@ -163,7 +164,7 @@ struct FullScreenLocationPicker: View {
             }
         }
     }
-    
+
     private func zoomMap(in zoomIn: Bool) {
         let newSpan = zoomIn ? max(currentZoomSpan * 0.4, 1000) : min(currentZoomSpan * 2.5, 500000)
         currentZoomSpan = newSpan

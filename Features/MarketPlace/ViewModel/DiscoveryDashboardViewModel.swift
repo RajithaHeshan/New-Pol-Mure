@@ -1,5 +1,4 @@
 
-
 import SwiftUI
 import MapKit
 import FirebaseAuth
@@ -8,36 +7,47 @@ import FirebaseFirestore
 @Observable
 @MainActor
 class DiscoveryDashboardViewModel {
-    
-    // MARK: - UI State
-    var searchText = ""
+
+  
+    var searchText = "" {
+        didSet { scheduleLocationSearch() }
+    }
     var selectedFilter = "All"
     let filters = ["All", "High Volume", "Ending Soon", "Nearest to Me"]
-    
+
     var showProfile = false
     var showNotifications = false
     var unreadNotificationCount = 3
-    
-    // Image State (Defaulting to your asset in case of slow internet)
+
+  
     var profileImageName: String = "Gemini_Generated_Image_l5uvm3l5uvm3l5uv"
+
     
-    // Map State
-    var searchCenter = CLLocationCoordinate2D(latitude: 6.9333, longitude: 79.9833)
-    var searchRadius: Double = 5.0
+    var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609) // Default: Kurunegala
+    var searchRadius: Double = 50.0
     var isFullScreenMapPresented = false
+
     
+    var isSearchingLocation = false
+    private var searchTask: Task<Void, Never>?
+
+   
+    var allSellers: [SellerLocation] = []
+    var isLoadingSellers = false
+
     init() {
         fetchUserProfile()
+        fetchSellers()
     }
+
     
-    // MARK: - Firebase Fetch Logic
     func fetchUserProfile() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
-        
+
         Task {
             do {
                 let document = try await Firestore.firestore().collection("users").document(userId).getDocument()
-                
+
                 // Fetch the asset string we saved during registration
                 if let imageName = document.data()?["profileImageName"] as? String {
                     DispatchQueue.main.async {
@@ -49,54 +59,155 @@ class DiscoveryDashboardViewModel {
             }
         }
     }
-    
-    // MARK: - Mock Data
-    let recommendedLots = [
-        HarvestLot(sellerInitial: "I. Fernando", locationName: "Kurunegala Zone", coordinate: CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609), quantity: 5000, currentBid: 110.0, endDate: Date().addingTimeInterval(86400)),
-        HarvestLot(sellerInitial: "S. Perera", locationName: "Kaduwela Center", coordinate: CLLocationCoordinate2D(latitude: 6.9333, longitude: 79.9833), quantity: 2500, currentBid: 115.0, endDate: Date().addingTimeInterval(172800))
-    ]
-    
-    let generalLots = [
-        HarvestLot(sellerInitial: "M. Silva", locationName: "Madampe", coordinate: CLLocationCoordinate2D(latitude: 7.4984, longitude: 79.8441), quantity: 10000, currentBid: 95.0, endDate: Date().addingTimeInterval(259200)),
-        HarvestLot(sellerInitial: "K. Alwis", locationName: "Malabe", coordinate: CLLocationCoordinate2D(latitude: 6.9044, longitude: 79.9606), quantity: 800, currentBid: 120.0, endDate: Date().addingTimeInterval(40000)),
-        HarvestLot(sellerInitial: "D. Peiris", locationName: "Biyagama", coordinate: CLLocationCoordinate2D(latitude: 6.9428, longitude: 79.9866), quantity: 4500, currentBid: 105.0, endDate: Date().addingTimeInterval(60000)),
-        HarvestLot(sellerInitial: "J. Perera", locationName: "Negombo", coordinate: CLLocationCoordinate2D(latitude: 7.2008, longitude: 79.8737), quantity: 6000, currentBid: 130.0, endDate: Date().addingTimeInterval(86400))
-    ]
-    
-    var filteredRecommendedLots: [HarvestLot] {
-        var results = recommendedLots
+
+   
+    func fetchSellers() {
+        isLoadingSellers = true
+
+        Task {
+            do {
+                let snapshot = try await Firestore.firestore()
+                    .collection("users")
+                    .whereField("role", isEqualTo: "SELLER")
+                    .getDocuments()
+
+                var sellers: [SellerLocation] = []
+
+                for doc in snapshot.documents {
+                    let data = doc.data()
+
+                    guard
+                        let name = data["fullName"] as? String,
+                        let location = data["locationName"] as? String
+                    else { continue }
+
+                    let yield = data["typicalYield"] as? String ?? "N/A"
+                    let cert = data["certificationLevel"] as? String ?? "Standard"
+                    let harvestTimestamp = data["nextHarvestDate"] as? Timestamp
+                    let harvestDate = harvestTimestamp?.dateValue() ?? Date()
+
+                    // Use stored coordinates if present, otherwise geocode locationName
+                    let coordinate: CLLocationCoordinate2D
+                    if let lat = data["latitude"] as? Double,
+                       let lng = data["longitude"] as? Double {
+                        coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                    } else {
+                        // Geocode the locationName and backfill Firestore so this only runs once
+                        if let resolved = await geocode(locationName: location) {
+                            coordinate = resolved
+                            try? await Firestore.firestore()
+                                .collection("users")
+                                .document(doc.documentID)
+                                .updateData(["latitude": resolved.latitude, "longitude": resolved.longitude])
+                        } else {
+                            continue
+                        }
+                    }
+
+                    sellers.append(SellerLocation(
+                        id: doc.documentID,
+                        sellerName: name,
+                        locationName: location,
+                        coordinate: coordinate,
+                        typicalYield: yield,
+                        certificationLevel: cert,
+                        nextHarvestDate: harvestDate
+                    ))
+                }
+
+                self.allSellers = sellers
+                self.isLoadingSellers = false
+
+            } catch {
+                print("Error fetching sellers from Firestore: \(error.localizedDescription)")
+                self.isLoadingSellers = false
+            }
+        }
+    }
+
+    // MARK: - Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
+    private func geocode(locationName: String) async -> CLLocationCoordinate2D? {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = locationName + ", Sri Lanka"
+        request.region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
+            latitudinalMeters: 500_000,
+            longitudinalMeters: 500_000
+        )
+        let search = MKLocalSearch(request: request)
+        let response = try? await search.start()
+        return response?.mapItems.first?.placemark.coordinate
+    }
+
+   
+    private func scheduleLocationSearch() {
+        searchTask?.cancel()
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        searchTask = Task {
+            // 0.5s debounce so we don't fire on every keystroke
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled else { return }
+
+            isSearchingLocation = true
+
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = query
+            // Bias results toward Sri Lanka
+            request.region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
+                latitudinalMeters: 500_000,
+                longitudinalMeters: 500_000
+            )
+
+            let search = MKLocalSearch(request: request)
+            if let response = try? await search.start(),
+               let coordinate = response.mapItems.first?.placemark.coordinate {
+                searchCenter = coordinate
+            }
+
+            isSearchingLocation = false
+        }
+    }
+
+    // MARK: - Filtered Sellers Within Search Radius
+    var sellersInRadius: [SellerLocation] {
+        let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
+
+        var results = allSellers.filter { seller in
+            let sellerLocation = CLLocation(latitude: seller.coordinate.latitude, longitude: seller.coordinate.longitude)
+            return (sellerLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
+        }
+
         switch selectedFilter {
-        case "High Volume": results = results.filter { $0.quantity >= 5000 }
-        case "Ending Soon": results = results.filter { $0.endDate.timeIntervalSinceNow < 172800 }
+        case "High Volume":
+            results = results.filter { (Int($0.typicalYield) ?? 0) >= 5000 }
+        case "Ending Soon":
+            results = results.filter { $0.nextHarvestDate.timeIntervalSinceNow < 604800 } // Within 7 days
         case "Nearest to Me":
-            let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
-            results.sort { lot1, lot2 in
-                let loc1 = CLLocation(latitude: lot1.coordinate.latitude, longitude: lot1.coordinate.longitude)
-                let loc2 = CLLocation(latitude: lot2.coordinate.latitude, longitude: lot2.coordinate.longitude)
+            results.sort { s1, s2 in
+                let loc1 = CLLocation(latitude: s1.coordinate.latitude, longitude: s1.coordinate.longitude)
+                let loc2 = CLLocation(latitude: s2.coordinate.latitude, longitude: s2.coordinate.longitude)
                 return loc1.distance(from: centerLocation) < loc2.distance(from: centerLocation)
             }
-        default: break
+        default:
+            break
         }
+
         return results
     }
-    
-    var filteredLots: [HarvestLot] {
+
+    // MARK: - Recommended Sellers (Top 3 by nearest distance)
+    var recommendedSellers: [SellerLocation] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
-        var results = generalLots.filter { lot in
-            let lotLocation = CLLocation(latitude: lot.coordinate.latitude, longitude: lot.coordinate.longitude)
-            return (lotLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
-        }
-        switch selectedFilter {
-        case "High Volume": results = results.filter { $0.quantity >= 5000 }
-        case "Ending Soon": results = results.filter { $0.endDate.timeIntervalSinceNow < 172800 }
-        case "Nearest to Me":
-            results.sort { lot1, lot2 in
-                let loc1 = CLLocation(latitude: lot1.coordinate.latitude, longitude: lot1.coordinate.longitude)
-                let loc2 = CLLocation(latitude: lot2.coordinate.latitude, longitude: lot2.coordinate.longitude)
+        return allSellers
+            .sorted { s1, s2 in
+                let loc1 = CLLocation(latitude: s1.coordinate.latitude, longitude: s1.coordinate.longitude)
+                let loc2 = CLLocation(latitude: s2.coordinate.latitude, longitude: s2.coordinate.longitude)
                 return loc1.distance(from: centerLocation) < loc2.distance(from: centerLocation)
             }
-        default: break
-        }
-        return results
+            .prefix(5)
+            .map { $0 }
     }
 }

@@ -31,13 +31,13 @@ class AuthManager {
     }
     
     // MARK: - Registration Backend (Seller)
-    func registerSeller(email: String, password: String, fullName: String, phone: String, yield: String, cycle: String, nextHarvestDate: Date, certification: String, locationName: String) async throws {
-        
+    func registerSeller(email: String, password: String, fullName: String, phone: String, yield: String, cycle: String, nextHarvestDate: Date, certification: String, locationName: String, latitude: Double, longitude: Double) async throws {
+
         // 1. Create Secure Credentials
         let authResult = try await Auth.auth().createUser(withEmail: email, password: password)
         let userId = authResult.user.uid
-        
-        // 2. Save Seller Profile to Firestore
+
+        // 2. Save Seller Profile to Firestore (latitude/longitude enable Buyer map discovery)
         let userData: [String: Any] = [
             "id": userId,
             "role": "SELLER", // Triggers routing to SellerDashboardView
@@ -49,6 +49,8 @@ class AuthManager {
             "nextHarvestDate": Timestamp(date: nextHarvestDate),
             "certificationLevel": certification,
             "locationName": locationName,
+            "latitude": latitude,
+            "longitude": longitude,
             "profileImageName": "Gemini_Generated_Image_bvc5lzbvc5lzbvc5", // Your specific seller asset
             "createdAt": Timestamp()
         ]
@@ -100,3 +102,4 @@ class AuthManager {
         }
     }
 }
+
