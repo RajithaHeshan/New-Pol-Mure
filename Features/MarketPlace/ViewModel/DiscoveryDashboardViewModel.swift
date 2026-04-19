@@ -3,12 +3,13 @@ import SwiftUI
 import MapKit
 import FirebaseAuth
 import FirebaseFirestore
+import UserNotifications
 
 @Observable
 @MainActor
 class DiscoveryDashboardViewModel {
 
-  
+    // MARK: - UI State
     var searchText = "" {
         didSet { scheduleLocationSearch() }
     }
@@ -19,28 +20,34 @@ class DiscoveryDashboardViewModel {
     var showNotifications = false
     var unreadNotificationCount = 3
 
-  
+    // Image State (Defaulting to your asset in case of slow internet)
     var profileImageName: String = "Gemini_Generated_Image_l5uvm3l5uvm3l5uv"
 
-    
+    // MARK: - Map State
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609) // Default: Kurunegala
     var searchRadius: Double = 50.0
     var isFullScreenMapPresented = false
 
-    
+    // MARK: - Search State
     var isSearchingLocation = false
     private var searchTask: Task<Void, Never>?
 
-   
+    // MARK: - Sellers Data (Loaded from Firestore)
     var allSellers: [SellerLocation] = []
     var isLoadingSellers = false
+
+    // MARK: - Highest Bids Per Seller (sellerID → highest bid amount)
+    var highestBids: [String: Double] = [:]
+    private var bidsListener: ListenerRegistration?
 
     init() {
         fetchUserProfile()
         fetchSellers()
+        attachBidsListener()
+        requestNotificationPermission()
     }
 
-    
+    // MARK: - Firebase Fetch Logic
     func fetchUserProfile() {
         guard let userId = Auth.auth().currentUser?.uid else { return }
 
@@ -50,9 +57,7 @@ class DiscoveryDashboardViewModel {
 
                 // Fetch the asset string we saved during registration
                 if let imageName = document.data()?["profileImageName"] as? String {
-                    DispatchQueue.main.async {
-                        self.profileImageName = imageName
-                    }
+                    self.profileImageName = imageName
                 }
             } catch {
                 print("Error fetching profile from Firestore: \(error.localizedDescription)")
@@ -60,7 +65,7 @@ class DiscoveryDashboardViewModel {
         }
     }
 
-   
+    // MARK: - Fetch Sellers from Firestore
     func fetchSellers() {
         isLoadingSellers = true
 
@@ -125,6 +130,40 @@ class DiscoveryDashboardViewModel {
         }
     }
 
+    // MARK: - Real-Time Bids Listener (Latest highest bid per seller)
+    private func attachBidsListener() {
+        bidsListener = Firestore.firestore()
+            .collection("bids")
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+
+                // Group by sellerID and keep the highest amount
+                var bids: [String: Double] = [:]
+                for doc in docs {
+                    let data = doc.data()
+                    guard
+                        let sellerID = data["sellerID"] as? String,
+                        let amount = data["amount"] as? Double
+                    else { continue }
+
+                    if (bids[sellerID] ?? 0) < amount {
+                        bids[sellerID] = amount
+                    }
+                }
+                self.highestBids = bids
+            }
+    }
+
+    // MARK: - Highest Bid Helper
+    func highestBid(for seller: SellerLocation) -> Double {
+        highestBids[seller.id] ?? 0.0
+    }
+
+    // MARK: - Notification Permission
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
     // MARK: - Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
     private func geocode(locationName: String) async -> CLLocationCoordinate2D? {
         let request = MKLocalSearch.Request()
@@ -139,7 +178,7 @@ class DiscoveryDashboardViewModel {
         return response?.mapItems.first?.placemark.coordinate
     }
 
-   
+    // MARK: - Location Search (Moves map center when user types in search bar)
     private func scheduleLocationSearch() {
         searchTask?.cancel()
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -198,7 +237,7 @@ class DiscoveryDashboardViewModel {
         return results
     }
 
-    // MARK: - Recommended Sellers (Top 3 by nearest distance)
+    // MARK: - Recommended Sellers (Top 5 by nearest distance)
     var recommendedSellers: [SellerLocation] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allSellers

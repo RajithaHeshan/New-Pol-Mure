@@ -1,5 +1,3 @@
-
-
 import SwiftUI
 import MapKit
 
@@ -11,7 +9,7 @@ struct DiscoveryDashboardView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
 
-                 
+                    
                     NavigationLink(destination: BuyerPerformanceView()) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
@@ -61,7 +59,10 @@ struct DiscoveryDashboardView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 16) {
                                     ForEach(viewModel.recommendedSellers) { seller in
-                                        RecommendedSellerCard(seller: seller)
+                                        RecommendedSellerCard(
+                                            seller: seller,
+                                            currentHighestBid: viewModel.highestBid(for: seller)
+                                        )
                                     }
                                 }
                                 .padding(.horizontal)
@@ -71,7 +72,7 @@ struct DiscoveryDashboardView: View {
 
                     Divider().padding(.vertical, 8)
 
-                   
+                 
                     VStack(spacing: 16) {
                         HStack {
                             Text("Find Sellers Near Me")
@@ -136,7 +137,7 @@ struct DiscoveryDashboardView: View {
 
                     Divider().padding(.vertical, 8)
 
-               
+                    // MARK: Sellers List
                     VStack(alignment: .leading) {
                         HStack {
                             Text("Sellers in Radius")
@@ -166,7 +167,10 @@ struct DiscoveryDashboardView: View {
                         } else {
                             LazyVStack(spacing: 16) {
                                 ForEach(viewModel.sellersInRadius) { seller in
-                                    SellerRow(seller: seller)
+                                    SellerRow(
+                                        seller: seller,
+                                        currentHighestBid: viewModel.highestBid(for: seller)
+                                    )
                                 }
                             }
                             .padding(.horizontal)
@@ -177,7 +181,7 @@ struct DiscoveryDashboardView: View {
             .navigationTitle("Marketplace")
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search a town e.g. Kurunegala...")
             .overlay(alignment: .top) {
-               
+                // Shows while MKLocalSearch is resolving the typed town name
                 if viewModel.isSearchingLocation {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
@@ -193,19 +197,19 @@ struct DiscoveryDashboardView: View {
                 }
             }
 
-       
+            // MARK: - HIG Compliant Navigation Bar
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
 
-                     
+                        // 1. Notification Action
                         Button(action: { viewModel.showNotifications = true }) {
                             Image(systemName: viewModel.unreadNotificationCount > 0 ? "bell.badge.fill" : "bell.fill")
                                 .font(.title3)
                                 .foregroundColor(.blue)
                         }
 
-                       
+                        // 2. Profile Action (Loads from Xcode Assets)
                         Button(action: { viewModel.showProfile = true }) {
                             Image(viewModel.profileImageName)
                                 .resizable()
@@ -216,7 +220,7 @@ struct DiscoveryDashboardView: View {
                     }
                 }
             }
-          
+            // MARK: - Profile / Developer Sheet
             .sheet(isPresented: $viewModel.showProfile) {
                 NavigationStack {
                     VStack(spacing: 24) {
