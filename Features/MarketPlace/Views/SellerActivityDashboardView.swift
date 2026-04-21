@@ -2,17 +2,18 @@
 
 import SwiftUI
 
-struct ActivityDashboardView: View {
-    @State private var viewModel = ActivityDashboardViewModel()
+struct SellerActivityDashboardView: View {
+    @State private var viewModel = SellerActivityDashboardViewModel()
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
 
+                // Updated Picker: Added Transactions Tab
                 Picker("Activity Type", selection: $viewModel.selectedTab) {
-                    Text("Bids").tag(0)
-                    Text("Offers").tag(1)
-                    Text("Transactions").tag(2)
+                    Text("Active Pitches").tag(0)
+                    Text("Direct Bids").tag(1)
+                    Text("Transactions").tag(2) // NEW TAB
                     Text("Contracts").tag(3)
                 }
                 .pickerStyle(.segmented)
@@ -23,54 +24,53 @@ struct ActivityDashboardView: View {
                     VStack(spacing: 16) {
 
                         if viewModel.selectedTab == 0 {
-
-                            if viewModel.isLoadingBids {
+                            // ACTIVE PITCHES
+                            if viewModel.isLoadingOffers {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 40)
-                            } else if viewModel.myBids.isEmpty {
-                                EmptyActivityView(message: "You haven't placed any bids yet.")
+                            } else if viewModel.myOffers.isEmpty {
+                                SellerEmptyActivityView(message: "You haven't pitched any buyers yet.")
                             } else {
-                                ForEach(viewModel.myBids) { bid in
-                                    PendingBidRow(
-                                        estateName: bid.sellerID,
-                                        currentBid: bid.amount,
-                                        isWinning: viewModel.isWinning(bid: bid)
+                                ForEach(viewModel.myOffers) { offer in
+                                    SellerPendingPitchRow(
+                                        buyerName: offer.buyerID,
+                                        location: "",
+                                        currentOffer: offer.amount,
+                                        isLowest: viewModel.isLowest(offer: offer)
                                     )
                                 }
                             }
 
                         } else if viewModel.selectedTab == 1 {
-
-                           
+                            // DIRECT BIDS
                             HStack {
-                                Text("Direct pitches from Sellers")
+                                Text("Inbound bids on your active harvests")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                 Spacer()
                             }
                             .padding(.horizontal)
 
-                            if viewModel.isLoadingOffers {
+                            if viewModel.isLoadingBids {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 40)
-                            } else if viewModel.incomingOffers.isEmpty {
-                                EmptyActivityView(message: "No seller pitches received yet.")
+                            } else if viewModel.incomingBids.isEmpty {
+                                SellerEmptyActivityView(message: "No bids received on your harvests yet.")
                             } else {
-                                ForEach(viewModel.incomingOffers) { offer in
-                                    DirectOfferRow(
-                                        sellerName: offer.sellerName,
+                                ForEach(viewModel.incomingBids) { bid in
+                                    SellerDirectBidRow(
+                                        buyerName: bid.bidderName,
                                         location: "",
                                         quantity: 0,
-                                        price: offer.amount
+                                        bidPrice: bid.amount
                                     )
                                 }
                             }
 
                         } else if viewModel.selectedTab == 2 {
-
-                           
+                            // TRANSACTIONS
                             HStack {
                                 Text("Recent Financial Transactions")
                                     .font(.caption)
@@ -84,10 +84,10 @@ struct ActivityDashboardView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 40)
                             } else if viewModel.transactions.isEmpty {
-                                EmptyActivityView(message: "No transactions found.")
+                                SellerEmptyActivityView(message: "No transactions found.")
                             } else {
                                 ForEach(viewModel.transactions) { tx in
-                                    TransactionRow(
+                                    SellerTransactionRow(
                                         date: viewModel.formattedDate(tx.date),
                                         description: tx.description,
                                         amount: tx.amount,
@@ -97,20 +97,19 @@ struct ActivityDashboardView: View {
                             }
 
                         } else {
-
-                           
+                            // CONTRACTS
                             if viewModel.isLoadingContracts {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 40)
                             } else if viewModel.contracts.isEmpty {
-                                EmptyActivityView(message: "No active contracts.")
+                                SellerEmptyActivityView(message: "No active contracts.")
                             } else {
                                 ForEach(viewModel.contracts) { contract in
-                                    NavigationLink(destination: Text("Active Contract View Placeholder")) {
-                                        ContractRow(
+                                    Button(action: {}) {
+                                        SellerContractRow(
                                             contractNumber: contract.contractRef,
-                                            sellerName: contract.sellerName,
+                                            partnerName: contract.buyerName,
                                             status: viewModel.statusDisplayText(contract.status)
                                         )
                                     }
@@ -124,14 +123,15 @@ struct ActivityDashboardView: View {
                 .background(Color(UIColor.systemGroupedBackground))
             }
             .navigationTitle("My Activity")
+            // Apply Orange Tint to the Segmented Picker
+            .tint(.orange)
         }
     }
 }
 
+// MARK: - Empty State
 
-
-
-struct EmptyActivityView: View {
+struct SellerEmptyActivityView: View {
     let message: String
 
     var body: some View {
@@ -148,32 +148,44 @@ struct EmptyActivityView: View {
     }
 }
 
+// MARK: - Subviews
 
-struct PendingBidRow: View {
-    let estateName: String
-    let currentBid: Double
-    let isWinning: Bool
+struct SellerPendingPitchRow: View {
+    let buyerName: String
+    let location: String
+    let currentOffer: Double
+    let isLowest: Bool // For sellers, being the lowest price is winning
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text(estateName)
+                Text(buyerName)
                     .font(.headline)
+                if !location.isEmpty {
+                    HStack {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(location)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
                 HStack {
                     Circle()
-                        .fill(isWinning ? Color.green : Color.red)
+                        .fill(isLowest ? Color.green : Color.red)
                         .frame(width: 8, height: 8)
-                    Text(isWinning ? "Highest Bidder" : "Outbid")
+                    Text(isLowest ? "Lowest Pitch (Winning)" : "Underbid")
                         .font(.caption.bold())
-                        .foregroundColor(isWinning ? .green : .red)
+                        .foregroundColor(isLowest ? .green : .red)
                 }
             }
             Spacer()
             VStack(alignment: .trailing) {
-                Text("My Bid")
+                Text("My Pitch")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("Rs \(currentBid, specifier: "%.2f")")
+                Text("Rs \(currentOffer, specifier: "%.2f")")
                     .font(.title3.bold())
             }
         }
@@ -184,22 +196,22 @@ struct PendingBidRow: View {
     }
 }
 
-struct DirectOfferRow: View {
-    let sellerName: String
+struct SellerDirectBidRow: View {
+    let buyerName: String
     let location: String
     let quantity: Int
-    let price: Double
+    let bidPrice: Double
 
     var body: some View {
         VStack(spacing: 16) {
             HStack(alignment: .top) {
-                Image(systemName: "person.circle.fill")
+                Image(systemName: "building.2.crop.circle.fill")
                     .resizable()
                     .frame(width: 40, height: 40)
-                    .foregroundColor(.gray.opacity(0.5))
+                    .foregroundColor(.orange.opacity(0.5)) // Orange Theme
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(sellerName)
+                    Text(buyerName)
                         .font(.headline)
                     if !location.isEmpty {
                         HStack {
@@ -219,15 +231,14 @@ struct DirectOfferRow: View {
                         Text("\(quantity) Nuts")
                             .font(.headline.bold())
                     }
-                    Text("Rs \(price, specifier: "%.2f") / nut")
+                    Text("Rs \(bidPrice, specifier: "%.2f") / nut")
                         .font(.subheadline)
                         .foregroundColor(.green)
                 }
             }
 
-       
             HStack(spacing: 12) {
-                Button(action: { /* Reject Logic */ }) {
+                Button(action: { /* Reject */ }) {
                     Text("Decline")
                         .font(.subheadline.bold())
                         .frame(maxWidth: .infinity)
@@ -237,12 +248,12 @@ struct DirectOfferRow: View {
                         .cornerRadius(8)
                 }
 
-                Button(action: { /* Accept -> Moves to Contracts and locks Escrow */ }) {
-                    Text("Accept Pitch")
+                Button(action: { /* Accept -> Moves to Contracts */ }) {
+                    Text("Accept Bid")
                         .font(.subheadline.bold())
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
-                        .background(Color.blue)
+                        .background(Color.orange) // Orange Theme
                         .foregroundColor(.white)
                         .cornerRadius(8)
                 }
@@ -255,7 +266,8 @@ struct DirectOfferRow: View {
     }
 }
 
-struct TransactionRow: View {
+// NEW COMPONENT: Seller Transaction Row
+struct SellerTransactionRow: View {
     let date: String
     let description: String
     let amount: Double
@@ -284,9 +296,9 @@ struct TransactionRow: View {
     }
 }
 
-struct ContractRow: View {
+struct SellerContractRow: View {
     let contractNumber: String
-    let sellerName: String
+    let partnerName: String
     let status: String
 
     var body: some View {
@@ -294,7 +306,7 @@ struct ContractRow: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Contract \(contractNumber)")
                     .font(.headline)
-                Text(sellerName)
+                Text(partnerName)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -304,17 +316,17 @@ struct ContractRow: View {
                     .font(.caption.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.blue.opacity(0.1))
-                    .foregroundColor(.blue)
+                    .background(Color.orange.opacity(0.1))
+                    .foregroundColor(.orange)
                     .clipShape(Capsule())
 
                 HStack {
                     Text("View Logistics")
                         .font(.caption.bold())
-                        .foregroundColor(.blue)
+                        .foregroundColor(.orange)
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.orange)
                 }
             }
         }
@@ -326,5 +338,5 @@ struct ContractRow: View {
 }
 
 #Preview {
-    ActivityDashboardView()
+    SellerActivityDashboardView()
 }

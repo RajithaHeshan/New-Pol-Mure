@@ -7,6 +7,7 @@ struct Contract: Identifiable {
     let id: String              // Firestore document ID
     let contractRef: String     // Human-readable reference e.g. "#8842"
     let buyerID: String
+    let buyerName: String
     let sellerID: String
     let sellerName: String
     let status: String          // "escrow" | "inspection" | "completed" | "rejected"
@@ -17,6 +18,7 @@ struct Contract: Identifiable {
         guard
             let contractRef = data["contractRef"] as? String,
             let buyerID     = data["buyerID"]     as? String,
+            let buyerName   = data["buyerName"]   as? String,
             let sellerID    = data["sellerID"]    as? String,
             let sellerName  = data["sellerName"]  as? String,
             let status      = data["status"]      as? String,
@@ -27,6 +29,7 @@ struct Contract: Identifiable {
         self.id          = id
         self.contractRef = contractRef
         self.buyerID     = buyerID
+        self.buyerName   = buyerName
         self.sellerID    = sellerID
         self.sellerName  = sellerName
         self.status      = status
