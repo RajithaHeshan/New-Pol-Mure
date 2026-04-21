@@ -24,14 +24,14 @@ class LiveBiddingViewModel {
     var isOutbid: Bool = false
     var isPlacingBid: Bool = false
 
-    // MARK: - Current Buyer Identity
+   
     private let currentBuyerID: String
     private var currentBuyerName: String = ""
 
-    // MARK: - Firestore Listener (held in nonisolated box — safe to release from deinit)
+   
     private let listenerBox = ListenerBox()
 
-    // First snapshot only syncs current state — never triggers an outbid alert
+ 
     private var isFirstSnapshot: Bool = true
 
     init(lot: HarvestLot) {

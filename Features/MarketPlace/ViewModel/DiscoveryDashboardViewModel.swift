@@ -237,7 +237,7 @@ class DiscoveryDashboardViewModel {
         return results
     }
 
-    // MARK: - Recommended Sellers (Top 5 by nearest distance)
+   
     var recommendedSellers: [SellerLocation] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allSellers

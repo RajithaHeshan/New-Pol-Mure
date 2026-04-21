@@ -192,8 +192,8 @@ struct SellerPerformanceView: View {
     var body: some View { Text("Seller Analytics Placeholder").navigationTitle("Performance") }
 }
 
-struct LiveOfferView: View {
-    let buyer: RegisteredBuyer
-    var body: some View { Text("Pitch Offer to \(buyer.name)").navigationTitle("Pitch Offer") }
-}
+//struct LiveOfferView: View {
+//    let buyer: RegisteredBuyer
+//    var body: some View { Text("Pitch Offer to \(buyer.name)").navigationTitle("Pitch Offer") }
+//}
 
