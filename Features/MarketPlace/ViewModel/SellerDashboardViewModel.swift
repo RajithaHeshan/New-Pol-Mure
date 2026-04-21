@@ -3,11 +3,17 @@ import MapKit
 import FirebaseAuth
 import FirebaseFirestore
 
+private final class DashboardListenerBox {
+    var listener: ListenerRegistration?
+    init() {}
+    deinit { listener?.remove() }
+}
+
 @Observable
 @MainActor
 class SellerDashboardViewModel {
 
-    // MARK: - UI State
+
     var searchText = "" {
         didSet { scheduleLocationSearch() }
     }
@@ -16,27 +22,119 @@ class SellerDashboardViewModel {
 
     var showProfile = false
     var showNotifications = false
-    var unreadNotificationCount = 2
+    var unreadNotificationCount: Int = 0
 
-    // MARK: - Profile Image State
+
     var profileImageName: String = "Gemini_Generated_Image_bvc5lzbvc5lzbvc5"
 
-   
+
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
     var searchRadius: Double = 50.0
     var isFullScreenMapPresented = false
 
-    // MARK: - Search State
+
     var isSearchingLocation = false
     private var searchTask: Task<Void, Never>?
 
-    // MARK: - Buyers Data (Loaded from Firestore)
+
     var allBuyers: [RegisteredBuyer] = []
     var isLoadingBuyers = false
+
+    // Live lowest offer per buyerID — drives the price badge on every buyer card
+    var lowestOfferPerBuyer: [String: Double] = [:]
+    private let offersListenerBox = DashboardListenerBox()
+
+    // MARK: - Live Dashboard Metrics (replaces hardcoded values)
+    var escrowTotal: Double = 0
+    var activeOffersTotal: Double = 0
+    var urgentContractMessage: String? = nil
+    private let metricsListenerBox  = DashboardListenerBox()
+    private let contractListenerBox = DashboardListenerBox()
 
     init() {
         fetchUserProfile()
         fetchBuyers()
+        attachOffersListener()
+        attachMetricsListener()
+        attachContractListener()
+    }
+
+    // MARK: - Real-Time Lowest Offer per Buyer
+    private func attachOffersListener() {
+        offersListenerBox.listener = Firestore.firestore()
+            .collection("offers")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+
+                if let error {
+                    print("Dashboard offers listener error: \(error.localizedDescription)")
+                    return
+                }
+
+                let allOffers = snapshot?.documents.compactMap {
+                    Offer(id: $0.documentID, data: $0.data())
+                } ?? []
+
+                // Rebuild the lowest-offer-per-buyer map on every snapshot
+                var map: [String: Double] = [:]
+                for offer in allOffers {
+                    if let existing = map[offer.buyerID] {
+                        if offer.amount < existing { map[offer.buyerID] = offer.amount }
+                    } else {
+                        map[offer.buyerID] = offer.amount
+                    }
+                }
+                self.lowestOfferPerBuyer = map
+
+                // activeOffersTotal = sum of the lowest pitch won per buyer by this seller
+                guard let sellerID = Auth.auth().currentUser?.uid else { return }
+                self.activeOffersTotal = allOffers
+                    .filter { $0.sellerID == sellerID }
+                    .reduce(0) { $0 + $1.amount }
+            }
+    }
+
+    // MARK: - Escrow Total from contracts collection
+    private func attachMetricsListener() {
+        guard let sellerID = Auth.auth().currentUser?.uid else { return }
+        metricsListenerBox.listener = Firestore.firestore()
+            .collection("contracts")
+            .whereField("sellerID", isEqualTo: sellerID)
+            .whereField("status", isEqualTo: "escrow")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("Metrics listener error: \(error.localizedDescription)")
+                    return
+                }
+                self.escrowTotal = snapshot?.documents.reduce(0.0) { sum, doc in
+                    sum + ((doc.data()["amount"] as? Double) ?? 0)
+                } ?? 0
+            }
+    }
+
+    // MARK: - Urgent Contract Banner from contracts collection
+    private func attachContractListener() {
+        guard let sellerID = Auth.auth().currentUser?.uid else { return }
+        contractListenerBox.listener = Firestore.firestore()
+            .collection("contracts")
+            .whereField("sellerID", isEqualTo: sellerID)
+            .whereField("status", isEqualTo: "inspection")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("Contract listener error: \(error.localizedDescription)")
+                    return
+                }
+                if let doc = snapshot?.documents.first,
+                   let contractRef = doc.data()["contractRef"] as? String {
+                    self.urgentContractMessage = "Buyer has arrived for Inspection on Contract \(contractRef)."
+                    self.unreadNotificationCount = snapshot?.documents.count ?? 0
+                } else {
+                    self.urgentContractMessage = nil
+                    self.unreadNotificationCount = 0
+                }
+            }
     }
 
     // MARK: - Firebase Fetch Logic
@@ -124,7 +222,7 @@ class SellerDashboardViewModel {
         }
     }
 
-    // MARK: - Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
+
     private func geocode(locationName: String) async -> CLLocationCoordinate2D? {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = locationName + ", Sri Lanka"
@@ -138,7 +236,7 @@ class SellerDashboardViewModel {
         return response?.mapItems.first?.placemark.coordinate
     }
 
-    // MARK: - Location Search (Moves map center when seller types in search bar)
+    
     private func scheduleLocationSearch() {
         searchTask?.cancel()
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -196,7 +294,7 @@ class SellerDashboardViewModel {
         return results
     }
 
-    // MARK: - Recommended Buyers (Top 5 nearest to seller's estate)
+  
     var recommendedBuyers: [RegisteredBuyer] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allBuyers
@@ -209,3 +307,4 @@ class SellerDashboardViewModel {
             .map { $0 }
     }
 }
+

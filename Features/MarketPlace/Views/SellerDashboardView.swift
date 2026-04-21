@@ -1,8 +1,4 @@
 
-
-
-
-
 import SwiftUI
 import MapKit
 
@@ -17,20 +13,32 @@ struct SellerDashboardView: View {
               
                     HStack(spacing: 16) {
                         NavigationLink(destination: SellerPerformanceView()) {
-                            MetricCard(title: "Escrow Pending", amount: "Rs 145K", icon: "lock.shield.fill", color: .green)
+                            MetricCard(
+                                title: "Escrow Pending",
+                                amount: viewModel.escrowTotal > 0 ? "Rs \(formatAmount(viewModel.escrowTotal))" : "—",
+                                icon: "lock.shield.fill",
+                                color: .green
+                            )
                         }
                         .buttonStyle(PlainButtonStyle())
 
                         NavigationLink(destination: SellerPerformanceView()) {
-                            MetricCard(title: "Active Bids", amount: "Rs 185K", icon: "chart.line.uptrend.xyaxis", color: .blue)
+                            MetricCard(
+                                title: "Active Offers",
+                                amount: viewModel.activeOffersTotal > 0 ? "Rs \(formatAmount(viewModel.activeOffersTotal))" : "—",
+                                icon: "chart.line.uptrend.xyaxis",
+                                color: .blue
+                            )
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
 
-                    UrgentActionBanner()
-                        .padding(.horizontal)
+                    if let message = viewModel.urgentContractMessage {
+                        UrgentActionBanner(message: message)
+                            .padding(.horizontal)
+                    }
 
                     Divider().padding(.vertical, 8)
 
@@ -56,7 +64,7 @@ struct SellerDashboardView: View {
                                 HStack(spacing: 16) {
                                     ForEach(viewModel.recommendedBuyers) { buyer in
                                         NavigationLink(destination: LiveOfferView(buyer: buyer)) {
-                                            RecommendedBuyerCard(buyer: buyer)
+                                            RecommendedBuyerCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id])
                                         }
                                         .buttonStyle(PlainButtonStyle())
                                     }
@@ -161,7 +169,7 @@ struct SellerDashboardView: View {
                         } else {
                             LazyVStack(spacing: 16) {
                                 ForEach(viewModel.buyersInRadius) { buyer in
-                                    BuyerRowCard(buyer: buyer)
+                                    BuyerRowCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id])
                                 }
                             }
                             .padding(.horizontal)
@@ -174,7 +182,7 @@ struct SellerDashboardView: View {
             .navigationTitle("Dashboard")
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search a town e.g. Kandy...")
             .overlay(alignment: .top) {
-                // Shows while MKLocalSearch is resolving the typed town name
+                
                 if viewModel.isSearchingLocation {
                     HStack(spacing: 8) {
                         ProgressView().scaleEffect(0.8)
@@ -190,7 +198,7 @@ struct SellerDashboardView: View {
                 }
             }
 
-            // MARK: - HIG Compliant Navigation Bar
+           
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
@@ -270,6 +278,12 @@ struct SellerDashboardView: View {
             }
         }
     }
+}
+
+private func formatAmount(_ value: Double) -> String {
+    if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
+    if value >= 1_000     { return String(format: "%.0fK", value / 1_000) }
+    return String(format: "%.0f", value)
 }
 
 #Preview {

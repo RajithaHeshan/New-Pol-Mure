@@ -3,50 +3,50 @@
 import SwiftUI
 import MapKit
 
-struct LiveBiddingView: View {
-    @State private var viewModel: LiveBiddingViewModel
-
+struct LiveOfferView: View {
+    @State private var viewModel: LiveOfferViewModel
     @FocusState private var isInputFocused: Bool
-
-    init(lot: HarvestLot) {
-        _viewModel = State(initialValue: LiveBiddingViewModel(lot: lot))
+    
+    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0) {
+        self._viewModel = State(initialValue: LiveOfferViewModel(buyer: buyer, currentMarketPrice: currentMarketPrice))
     }
-
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-
-                BiddingMapHeader(coordinate: viewModel.lot.coordinate)
-
+                
+                OfferMapHeader(coordinate: viewModel.buyer.coordinate)
+                
                 VStack(alignment: .leading, spacing: 24) {
-
-                    HarvestDetailSection(lot: viewModel.lot)
-
+                    
+                    BuyerDetailSection(buyer: viewModel.buyer)
+                    
                     Divider()
-
-                    // MARK: - Navigation to Market Analytics
+                    
+                  
                     NavigationLink(destination: MarketAnalyticsView()) {
                         HStack {
                             Image(systemName: "chart.xyaxis.line")
-                            Text("Check Market Prices Before Bidding")
+                            Text("Check Market Prices Before Pitching")
                             Spacer()
                             Image(systemName: "chevron.right")
                         }
                         .font(.subheadline.bold())
-                        .foregroundColor(.blue)
+                        .foregroundColor(.orange)
                         .padding()
-                        .background(Color.blue.opacity(0.1))
+                        .background(Color.orange.opacity(0.1))
                         .cornerRadius(12)
                     }
-
-                    BiddingTerminal(viewModel: viewModel, isInputFocused: _isInputFocused)
-
-                    PresentationDebugTools(viewModel: viewModel)
+                    
+                    OfferTerminal(viewModel: viewModel, isInputFocused: _isInputFocused)
+                    
+                    PresentationDebugToolsOffer(viewModel: viewModel)
+                    
                 }
                 .padding(20)
             }
         }
-        .navigationTitle("Auction Details")
+        .navigationTitle("Pitch Details")
         .navigationBarTitleDisplayMode(.inline)
         .onTapGesture {
             isInputFocused = false
@@ -55,11 +55,11 @@ struct LiveBiddingView: View {
 }
 
 
-struct BiddingMapHeader: View {
+
+struct OfferMapHeader: View {
     let coordinate: CLLocationCoordinate2D
-
     @State private var cameraPosition: MapCameraPosition
-
+    
     init(coordinate: CLLocationCoordinate2D) {
         self.coordinate = coordinate
         let customCamera = MapCamera(
@@ -70,112 +70,111 @@ struct BiddingMapHeader: View {
         )
         self._cameraPosition = State(initialValue: .camera(customCamera))
     }
-
+    
     var body: some View {
         Map(position: $cameraPosition, interactionModes: []) {
             MapPolygon(coordinates: createCylinderBase(center: coordinate, radiusMeters: 2500))
-                .foregroundStyle(.blue.opacity(0.3))
-            Marker("Estate Location", coordinate: coordinate)
-                .tint(.blue)
+                .foregroundStyle(.orange.opacity(0.3))
+            
+            Marker("Buyer Location", coordinate: coordinate)
+                .tint(.orange)
         }
         .frame(height: 220)
-        .mask(
-            LinearGradient(
-                gradient: Gradient(colors: [.black, .black, .black, .clear]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .mask(LinearGradient(gradient: Gradient(colors: [.black, .black, .black, .clear]), startPoint: .top, endPoint: .bottom))
     }
-
+    
     private func createCylinderBase(center: CLLocationCoordinate2D, radiusMeters: Double) -> [CLLocationCoordinate2D] {
         let earthRadius = 6378100.0
         let lat = center.latitude * .pi / 180.0
         let lon = center.longitude * .pi / 180.0
-
+        
         var points: [CLLocationCoordinate2D] = []
         for i in 0..<36 {
             let angle = Double(i) * 10.0 * .pi / 180.0
             let dLat = (radiusMeters * cos(angle)) / earthRadius
             let dLon = (radiusMeters * sin(angle)) / (earthRadius * cos(lat))
-            points.append(CLLocationCoordinate2D(
-                latitude: (lat + dLat) * 180.0 / .pi,
-                longitude: (lon + dLon) * 180.0 / .pi
-            ))
+            
+            points.append(CLLocationCoordinate2D(latitude: (lat + dLat) * 180.0 / .pi,
+                                                 longitude: (lon + dLon) * 180.0 / .pi))
         }
         return points
     }
 }
 
-
-struct HarvestDetailSection: View {
-    let lot: HarvestLot
-
+struct BuyerDetailSection: View {
+    let buyer: RegisteredBuyer
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "person.circle.fill")
+                Image(systemName: "building.2.crop.circle.fill")
                     .resizable()
                     .frame(width: 50, height: 50)
                     .foregroundColor(.gray.opacity(0.5))
-
+                
                 VStack(alignment: .leading) {
-                    Text(lot.sellerInitial)
-                        .font(.title3.bold())
+                    HStack {
+                        Text(buyer.name)
+                            .font(.title3.bold())
+                        if buyer.isUrgent {
+                            Image(systemName: "flame.fill")
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
                     HStack {
                         Image(systemName: "mappin.and.ellipse")
                             .foregroundColor(.secondary)
-                        Text(lot.locationName)
+                        Text(buyer.locationName)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                 }
             }
-
-            Text("\(lot.quantity) Coconuts")
+            
+            Text("Needs \(buyer.typicalVolume)")
                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                 .padding(.top, 8)
-
+            
             HStack {
-                Image(systemName: "calendar.badge.clock")
-                    .foregroundColor(.blue)
-                Text("Auction closes in 24 Hours")
+                Image(systemName: "hand.raised.fill")
+                    .foregroundColor(.orange)
+                Text(buyer.isUrgent ? "Urgent Pitch Request" : "Accepting Pitches")
                     .font(.subheadline.bold())
             }
             .padding(10)
-            .background(Color.blue.opacity(0.1))
+            .background(Color.orange.opacity(0.1))
             .cornerRadius(8)
         }
     }
 }
 
-
-struct BiddingTerminal: View {
-    @Bindable var viewModel: LiveBiddingViewModel
+struct OfferTerminal: View {
+    @Bindable var viewModel: LiveOfferViewModel
     @FocusState var isInputFocused: Bool
-
+    
     var body: some View {
         VStack(spacing: 20) {
-
-           
+            
+            // Live Status Card
             VStack(spacing: 8) {
-                Text(viewModel.isOutbid ? "WARNING: YOU WERE OUTBID!" : "CURRENT HIGHEST BID")
+                Text(viewModel.isUndercut ? "WARNING: CHEAPER OFFER SUBMITTED!" : "CURRENT LOWEST PITCH")
                     .font(.caption.bold())
-                    .foregroundColor(viewModel.isOutbid ? .red : .secondary)
+                    .foregroundColor(viewModel.isUndercut ? .red : .secondary)
 
-                Text("Rs \(viewModel.currentHighestBid, specifier: "%.2f")")
+                Text("Rs \(viewModel.currentLowestOffer, specifier: "%.2f")")
                     .font(.system(size: 40, weight: .bold, design: .monospaced))
-                    .foregroundColor(viewModel.isOutbid ? .red : .green)
+                    .foregroundColor(viewModel.isUndercut ? .red : .green)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
-            .background(viewModel.isOutbid ? Color.red.opacity(0.1) : Color.green.opacity(0.05))
+            .background(viewModel.isUndercut ? Color.red.opacity(0.1) : Color.green.opacity(0.05))
             .cornerRadius(16)
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isOutbid)
-
-            // MARK: - Stepper & Input Area
+            .animation(.easeInOut(duration: 0.3), value: viewModel.isUndercut)
+            
+            // Stepper & Input Area
             HStack(spacing: 12) {
-                Button(action: { viewModel.decrementBid() }) {
+                Button(action: { viewModel.decrementOffer() }) {
                     Image(systemName: "minus")
                         .font(.title2.bold())
                         .frame(width: 50, height: 50)
@@ -183,13 +182,13 @@ struct BiddingTerminal: View {
                         .foregroundColor(.primary)
                         .cornerRadius(12)
                 }
-
+                
                 HStack {
                     Text("Rs")
                         .font(.title2.bold())
                         .foregroundColor(.secondary)
-
-                    TextField("Bid", text: $viewModel.userBidInput)
+                    
+                    TextField("Offer", text: $viewModel.userOfferInput)
                         .keyboardType(.decimalPad)
                         .focused($isInputFocused)
                         .multilineTextAlignment(.center)
@@ -198,8 +197,8 @@ struct BiddingTerminal: View {
                 .padding()
                 .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(12)
-
-                Button(action: { viewModel.incrementBid(by: 1) }) {
+                
+                Button(action: { viewModel.incrementOffer(by: 1) }) {
                     Image(systemName: "plus")
                         .font(.title2.bold())
                         .frame(width: 50, height: 50)
@@ -208,53 +207,53 @@ struct BiddingTerminal: View {
                         .cornerRadius(12)
                 }
             }
-
-            // MARK: - Quick Increment Chips
+            
             HStack(spacing: 12) {
                 ForEach([1, 5, 10], id: \.self) { amount in
-                    Button(action: { viewModel.incrementBid(by: Double(amount)) }) {
-                        Text("+ Rs \(amount)")
+                    Button(action: { viewModel.decrementOffer(bySpecificAmount: Double(amount)) }) {
+                        Text("- Rs \(amount)")
                             .font(.subheadline.bold())
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
+                            .background(Color.orange.opacity(0.1))
+                            .foregroundColor(.orange)
                             .clipShape(Capsule())
                     }
                 }
             }
-
-            // MARK: - Place Bid Button
+            
+            // MARK: - Send Pitch Button
             Button(action: {
-                viewModel.placeBid()
+                viewModel.sendPitch()
                 isInputFocused = false
             }) {
                 Group {
-                    if viewModel.isPlacingBid {
+                    if viewModel.isPlacingOffer {
                         ProgressView().tint(.white)
                     } else {
-                        Text("Place Bid")
+                        Text("Send Pitch")
                             .font(.headline)
                     }
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
+                .background(Color.orange)
                 .foregroundColor(.white)
                 .cornerRadius(12)
             }
-            .disabled(viewModel.isPlacingBid)
+            .disabled(viewModel.isPlacingOffer)
         }
     }
 }
 
-// MARK: - Presentation Debug Tools
-struct PresentationDebugTools: View {
-    @Bindable var viewModel: LiveBiddingViewModel
-
+struct PresentationDebugToolsOffer: View {
+    @Bindable var viewModel: LiveOfferViewModel
+    
     var body: some View {
-        Button(action: { viewModel.simulateOutbid() }) {
-            Text("🔧 Simulate WebSocket Outbid Event")
+        Button(action: {
+            viewModel.simulateCheaperOffer()
+        }) {
+            Text("🔧 Simulate Competitor Cheaper Offer")
                 .font(.caption.bold())
                 .foregroundColor(.red)
                 .frame(maxWidth: .infinity)
@@ -266,23 +265,16 @@ struct PresentationDebugTools: View {
     }
 }
 
-struct MarketAnalyticsView: View {
-    var body: some View {
-        Text("Market Analytics Placeholder")
-            .navigationTitle("Market Prices")
-    }
-}
-
 #Preview {
     NavigationStack {
-        LiveBiddingView(lot: HarvestLot(
-            id: "preview-seller-id",
-            sellerInitial: "M. Silva",
-            locationName: "Madampe",
-            coordinate: CLLocationCoordinate2D(latitude: 7.4984, longitude: 79.8441),
-            quantity: 10000,
-            currentBid: 95.0,
-            endDate: Date().addingTimeInterval(86400)
+        LiveOfferView(buyer: RegisteredBuyer(
+            id: UUID().uuidString,
+            name: "Nimal's Bakery",
+            locationName: "Kaduwela Center",
+            coordinate: CLLocationCoordinate2D(latitude: 6.9333, longitude: 79.9833),
+            typicalVolume: "5K - 10K Nuts",
+            rating: 4.7,
+            isUrgent: true
         ))
     }
 }

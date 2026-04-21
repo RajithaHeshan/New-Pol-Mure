@@ -56,6 +56,8 @@ struct MetricCard: View {
 }
 
 struct UrgentActionBanner: View {
+    let message: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -65,10 +67,10 @@ struct UrgentActionBanner: View {
                     .font(.subheadline.bold())
                 Spacer()
             }
-            
-            Text("Buyer has arrived for Inspection on Contract #8842.")
+
+            Text(message)
                 .font(.subheadline)
-            
+
             Button(action: {}) {
                 Text("Verify Quality")
                     .font(.subheadline.bold())
@@ -91,7 +93,8 @@ struct UrgentActionBanner: View {
 
 struct RecommendedBuyerCard: View {
     let buyer: RegisteredBuyer
-    
+    var lowestOffer: Double?
+
     var body: some View {
         VStack(alignment: .leading) {
             Map(interactionModes: []) {
@@ -100,7 +103,7 @@ struct RecommendedBuyerCard: View {
             }
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(buyer.name)
@@ -112,11 +115,11 @@ struct RecommendedBuyerCard: View {
                             .font(.caption)
                     }
                 }
-                
+
                 Text(buyer.locationName)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                
+
                 HStack {
                     Text("Buys: \(buyer.typicalVolume)")
                         .font(.subheadline.bold())
@@ -131,6 +134,18 @@ struct RecommendedBuyerCard: View {
                     }
                 }
                 .padding(.top, 4)
+
+                // MARK: - Live Lowest Offer Badge
+                if let price = lowestOffer {
+                    HStack(spacing: 4) {
+                        Image(systemName: "tag.fill")
+                            .font(.caption2)
+                        Text("Lowest: Rs \(String(format: "%.0f", price))")
+                            .font(.caption.bold())
+                    }
+                    .foregroundColor(.green)
+                    .padding(.top, 2)
+                }
             }
             .padding(.top, 8)
         }
@@ -144,46 +159,59 @@ struct RecommendedBuyerCard: View {
 
 struct BuyerRowCard: View {
     let buyer: RegisteredBuyer
-    
+    var lowestOffer: Double?
+
     var body: some View {
-        HStack {
-            Image(systemName: "building.2.crop.circle.fill")
-                .resizable()
-                .frame(width: 40, height: 40)
-                .foregroundColor(.gray.opacity(0.5))
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(buyer.name)
-                        .font(.subheadline.bold())
-                    if buyer.isUrgent {
-                        Image(systemName: "flame.fill")
-                            .font(.caption2)
-                            .foregroundColor(.red)
+        NavigationLink(destination: LiveOfferView(buyer: buyer)) {
+            HStack {
+                Image(systemName: "building.2.crop.circle.fill")
+                    .resizable()
+                    .frame(width: 40, height: 40)
+                    .foregroundColor(.gray.opacity(0.5))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(buyer.name)
+                            .font(.subheadline.bold())
+                            .foregroundColor(.primary)
+                        if buyer.isUrgent {
+                            Image(systemName: "flame.fill")
+                                .font(.caption2)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    Text("Needs \(buyer.typicalVolume)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    // MARK: - Live Lowest Offer Badge
+                    if let price = lowestOffer {
+                        HStack(spacing: 3) {
+                            Image(systemName: "tag.fill")
+                                .font(.caption2)
+                            Text("Rs \(String(format: "%.0f", price))")
+                                .font(.caption.bold())
+                        }
+                        .foregroundColor(.green)
                     }
                 }
-                Text("Needs \(buyer.typicalVolume)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                .padding(.leading, 4)
+
+                Spacer()
+
+                Text("Pitch Offer")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.orange)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
             }
-            .padding(.leading, 4)
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 6) {
-                NavigationLink(destination: LiveOfferView(buyer: buyer)) {
-                    Text("Pitch Offer")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(Color.orange)
-                        .foregroundColor(.white)
-                        .clipShape(Capsule())
-                }
-            }
+            .padding()
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(12)
         }
-        .padding()
-        .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
@@ -192,8 +220,8 @@ struct SellerPerformanceView: View {
     var body: some View { Text("Seller Analytics Placeholder").navigationTitle("Performance") }
 }
 
-struct LiveOfferView: View {
-    let buyer: RegisteredBuyer
-    var body: some View { Text("Pitch Offer to \(buyer.name)").navigationTitle("Pitch Offer") }
-}
+//struct LiveOfferView: View {
+//    let buyer: RegisteredBuyer
+//    var body: some View { Text("Pitch Offer to \(buyer.name)").navigationTitle("Pitch Offer") }
+//}
 

@@ -1,68 +1,108 @@
+
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
 import UserNotifications
 
+
+private final class ListenerBox {
+    var listener: ListenerRegistration?
+    init() {}
+    deinit { listener?.remove() }
+}
+
 @Observable
 @MainActor
 class LiveBiddingViewModel {
 
-    // MARK: - Lot Data
     let lot: HarvestLot
 
-    // MARK: - Bidding State
+   
     var userBidInput: String = ""
     var currentHighestBid: Double
     var currentHighestBidderID: String = ""
     var isOutbid: Bool = false
     var isPlacingBid: Bool = false
 
-    // MARK: - Current Buyer Identity
+   
     private let currentBuyerID: String
-    private let currentBuyerName: String
+    private var currentBuyerName: String = ""
 
-    // MARK: - Firestore Listener
-    private var bidsListener: ListenerRegistration?
+   
+    private let listenerBox = ListenerBox()
+
+ 
+    private var isFirstSnapshot: Bool = true
 
     init(lot: HarvestLot) {
         self.lot = lot
         self.currentHighestBid = lot.currentBid
         self.currentBuyerID = Auth.auth().currentUser?.uid ?? ""
-        self.currentBuyerName = Auth.auth().currentUser?.displayName ?? "Anonymous"
+        fetchBuyerName()
         attachBidsListener()
     }
 
-    nonisolated func stopListening() {
-        Task { @MainActor [weak self] in self?.bidsListener?.remove() }
+    // MARK: - Fetch Buyer Name from Firestore (fullName saved during registration)
+    private func fetchBuyerName() {
+        guard !currentBuyerID.isEmpty else { return }
+        Task {
+            let doc = try? await Firestore.firestore()
+                .collection("users")
+                .document(currentBuyerID)
+                .getDocument()
+            if let name = doc?.data()?["fullName"] as? String {
+                currentBuyerName = name
+            }
+        }
     }
 
-    deinit {
-        stopListening()
-    }
-
-    // MARK: - Real-Time Bid Listener
+   
     private func attachBidsListener() {
-        bidsListener = Firestore.firestore()
+        listenerBox.listener = Firestore.firestore()
             .collection("bids")
             .whereField("sellerID", isEqualTo: lot.id)
-            .order(by: "amount", descending: true)
-            .limit(to: 1)
-            .addSnapshotListener { [weak self] snapshot, _ in
+            .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
-                guard let doc = snapshot?.documents.first,
-                      let bid = Bid(id: doc.documentID, data: doc.data()) else { return }
+                if let error {
+                    print("Bids listener error: \(error.localizedDescription)")
+                    return
+                }
 
-                let previousHighest = self.currentHighestBid
-                let wasLeading = (self.currentHighestBidderID == self.currentBuyerID)
+                let allBids = snapshot?.documents.compactMap {
+                    Bid(id: $0.documentID, data: $0.data())
+                } ?? []
 
-                self.currentHighestBid = bid.amount
-                self.currentHighestBidderID = bid.bidderID
+                guard let topBid = allBids.sorted(by: { $0.amount > $1.amount }).first else {
+                    self.isFirstSnapshot = false
+                    return
+                }
 
-                // Notify buyer only if they were previously leading and someone outbid them
-                if wasLeading && bid.bidderID != self.currentBuyerID && bid.amount > previousHighest {
-                    self.isOutbid = true
-                    self.triggerOutbidNotification(newAmount: bid.amount, bidderName: bid.bidderName)
+        
+                if self.isFirstSnapshot {
+                    self.currentHighestBid = topBid.amount
+                    self.currentHighestBidderID = topBid.bidderID
+                    self.isFirstSnapshot = false
+                    return
+                }
+
+                let previousLeaderID = self.currentHighestBidderID
+                self.currentHighestBid = topBid.amount
+                self.currentHighestBidderID = topBid.bidderID
+
+              
+                if topBid.bidderID == self.currentBuyerID {
+                    self.isOutbid = false
+                    return
+                }
+
+             
+                let currentBuyerHasBid = allBids.contains { $0.bidderID == self.currentBuyerID }
+                if currentBuyerHasBid {
+                    if topBid.bidderID != previousLeaderID {
+                        self.isOutbid = true
+                        self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName)
+                    }
                 }
             }
     }
@@ -94,9 +134,7 @@ class LiveBiddingViewModel {
                     "placedAt": Timestamp()
                 ]
                 try await Firestore.firestore().collection("bids").addDocument(data: bidData)
-
                 userBidInput = ""
-                isOutbid = false
             } catch {
                 print("Error placing bid: \(error.localizedDescription)")
             }
@@ -105,27 +143,44 @@ class LiveBiddingViewModel {
     }
 
     // MARK: - Local Push Notification (Outbid Alert)
-    private func triggerOutbidNotification(newAmount: Double, bidderName: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "You've Been Outbid!"
-        content.body = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(lot.sellerInitial)'s lot. Bid higher to stay in."
-        content.sound = .defaultCritical
+    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
+        let sellerName = lot.sellerInitial
+        let lotID = lot.id
 
-        let request = UNNotificationRequest(
-            identifier: "outbid-\(lot.id)-\(Date().timeIntervalSince1970)",
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request)
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else {
+                print("Notifications not authorized — status: \(settings.authorizationStatus.rawValue)")
+                return
+            }
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
+            let content = UNMutableNotificationContent()
+            content.title = "You've Been Outbid!"
+            content.body = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)",
+                content: content,
+                trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error {
+                    print("Notification error: \(error.localizedDescription)")
+                } else {
+                    print("Outbid notification scheduled successfully for \(bidderName)")
+                }
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
     // MARK: - Debug / Simulation
     func simulateOutbid() {
-        currentHighestBid += 5.0
+        let simulatedAmount = currentHighestBid + 5.0
+        currentHighestBid = simulatedAmount
+        currentHighestBidderID = "simulated-other-buyer"
         isOutbid = true
-        triggerOutbidNotification(newAmount: currentHighestBid, bidderName: "Test Buyer")
+        scheduleOutbidNotification(newAmount: simulatedAmount, bidderName: "Test Buyer")
     }
 }
