@@ -61,10 +61,9 @@ struct SellerActivityDashboardView: View {
                             } else {
                                 ForEach(viewModel.incomingBids) { bid in
                                     SellerDirectBidRow(
-                                        buyerName: bid.bidderName,
-                                        location: "",
-                                        quantity: 0,
-                                        bidPrice: bid.amount
+                                        bid: bid,
+                                        onAccept:  { viewModel.acceptBid(bid) },
+                                        onDecline: { viewModel.declineBid(bid) }
                                     )
                                 }
                             }
@@ -106,7 +105,7 @@ struct SellerActivityDashboardView: View {
                                 SellerEmptyActivityView(message: "No active contracts.")
                             } else {
                                 ForEach(viewModel.contracts) { contract in
-                                    Button(action: {}) {
+                                    NavigationLink(destination: SellerContractView(contract: contract)) {
                                         SellerContractRow(
                                             contractNumber: contract.contractRef,
                                             partnerName: contract.buyerName,
@@ -197,10 +196,9 @@ struct SellerPendingPitchRow: View {
 }
 
 struct SellerDirectBidRow: View {
-    let buyerName: String
-    let location: String
-    let quantity: Int
-    let bidPrice: Double
+    let bid: Bid
+    let onAccept:  () -> Void
+    let onDecline: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -211,51 +209,63 @@ struct SellerDirectBidRow: View {
                     .foregroundColor(.orange.opacity(0.5)) // Orange Theme
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(buyerName)
+                    Text(bid.bidderName)
                         .font(.headline)
-                    if !location.isEmpty {
-                        HStack {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption)
-                            Text(location)
-                                .font(.caption)
-                        }
+                    Text(bid.placedAt, style: .relative)
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                    }
                 }
 
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if quantity > 0 {
-                        Text("\(quantity) Nuts")
-                            .font(.headline.bold())
-                    }
-                    Text("Rs \(bidPrice, specifier: "%.2f") / nut")
+                    Text("Rs \(bid.amount, specifier: "%.2f") / nut")
                         .font(.subheadline)
                         .foregroundColor(.green)
+
+                    // Status badge — shown after seller acts
+                    if bid.status == "accepted" {
+                        Text("Accepted")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.green.opacity(0.15))
+                            .foregroundColor(.green)
+                            .clipShape(Capsule())
+                    } else if bid.status == "declined" {
+                        Text("Declined")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .clipShape(Capsule())
+                    }
                 }
             }
 
-            HStack(spacing: 12) {
-                Button(action: { /* Reject */ }) {
-                    Text("Decline")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
-                        .cornerRadius(8)
-                }
+            // Accept / Decline buttons — hidden once a decision is made
+            if bid.status == "pending" {
+                HStack(spacing: 12) {
+                    Button(action: onDecline) {
+                        Text("Decline")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .cornerRadius(8)
+                    }
 
-                Button(action: { /* Accept -> Moves to Contracts */ }) {
-                    Text("Accept Bid")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.orange) // Orange Theme
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+                    Button(action: onAccept) {
+                        Text("Accept Bid")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.orange) // Orange Theme
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
                 }
             }
         }

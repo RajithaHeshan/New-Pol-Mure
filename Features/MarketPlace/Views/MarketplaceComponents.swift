@@ -136,6 +136,6 @@ struct SellerRow: View {
 }
 
 // MARK: - Temporary Placeholders (To prevent build errors)
-struct BuyerPerformanceView: View {
-    var body: some View { Text("Analytics Dashboard Placeholder").navigationTitle("Performance") }
-}
+//struct BuyerPerformanceView: View {
+//    var body: some View { Text("Analytics Dashboard Placeholder").navigationTitle("Performance") }
+//}

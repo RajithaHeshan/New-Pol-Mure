@@ -1,3 +1,5 @@
+// Location: New-Pol-Mure/Models/Offer.swift
+
 import Foundation
 import FirebaseFirestore
 
@@ -8,14 +10,15 @@ struct Offer: Identifiable {
     let sellerName: String
     let amount: Double
     let placedAt: Date
+    let status: String          // "pending" | "accepted" | "declined"
 
     init?(id: String, data: [String: Any]) {
         guard
-            let buyerID   = data["buyerID"]    as? String,
-            let sellerID  = data["sellerID"]   as? String,
+            let buyerID    = data["buyerID"]    as? String,
+            let sellerID   = data["sellerID"]   as? String,
             let sellerName = data["sellerName"] as? String,
-            let amount    = data["amount"]     as? Double,
-            let placedAt  = (data["placedAt"]  as? Timestamp)?.dateValue()
+            let amount     = data["amount"]     as? Double,
+            let placedAt   = (data["placedAt"]  as? Timestamp)?.dateValue()
         else { return nil }
 
         self.id         = id
@@ -24,8 +27,6 @@ struct Offer: Identifiable {
         self.sellerName = sellerName
         self.amount     = amount
         self.placedAt   = placedAt
+        self.status     = data["status"] as? String ?? "pending"
     }
 }
-
-
-

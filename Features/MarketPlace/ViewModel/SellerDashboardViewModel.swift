@@ -48,8 +48,14 @@ class SellerDashboardViewModel {
     var escrowTotal: Double = 0
     var activeOffersTotal: Double = 0
     var urgentContractMessage: String? = nil
-    private let metricsListenerBox  = DashboardListenerBox()
-    private let contractListenerBox = DashboardListenerBox()
+    var urgentContract: Contract? = nil
+    private let metricsListenerBox   = DashboardListenerBox()
+    private let contractListenerBox  = DashboardListenerBox()
+    private let disputeListenerBox   = DashboardListenerBox()
+
+    // Internal cache — merged from two separate Firestore listeners
+    private var disputeContract:  Contract? = nil
+    private var approvedContract: Contract? = nil
 
     init() {
         fetchUserProfile()
@@ -57,7 +63,9 @@ class SellerDashboardViewModel {
         attachOffersListener()
         attachMetricsListener()
         attachContractListener()
+        attachDisputeListener()
     }
+
 
     // MARK: - Real-Time Lowest Offer per Buyer
     private func attachOffersListener() {
@@ -113,28 +121,62 @@ class SellerDashboardViewModel {
             }
     }
 
-    // MARK: - Urgent Contract Banner from contracts collection
+    // MARK: - Listener: qualityApproved contracts (buyer approved, seller must confirm handover)
     private func attachContractListener() {
         guard let sellerID = Auth.auth().currentUser?.uid else { return }
         contractListenerBox.listener = Firestore.firestore()
             .collection("contracts")
             .whereField("sellerID", isEqualTo: sellerID)
-            .whereField("status", isEqualTo: "inspection")
+            .whereField("status", isEqualTo: "qualityApproved")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
                 if let error {
                     print("Contract listener error: \(error.localizedDescription)")
                     return
                 }
-                if let doc = snapshot?.documents.first,
-                   let contractRef = doc.data()["contractRef"] as? String {
-                    self.urgentContractMessage = "Buyer has arrived for Inspection on Contract \(contractRef)."
-                    self.unreadNotificationCount = snapshot?.documents.count ?? 0
-                } else {
-                    self.urgentContractMessage = nil
-                    self.unreadNotificationCount = 0
+                self.approvedContract = snapshot?.documents.first.flatMap {
+                    Contract(id: $0.documentID, data: $0.data())
                 }
+                self.updateUrgentBanner()
             }
+    }
+
+    // MARK: - Listener: disputed contracts (buyer raised dispute, seller must review)
+    private func attachDisputeListener() {
+        guard let sellerID = Auth.auth().currentUser?.uid else { return }
+        disputeListenerBox.listener = Firestore.firestore()
+            .collection("contracts")
+            .whereField("sellerID", isEqualTo: sellerID)
+            .whereField("status", isEqualTo: "dispute")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("Dispute contract listener error: \(error.localizedDescription)")
+                    return
+                }
+                self.disputeContract = snapshot?.documents.first.flatMap {
+                    Contract(id: $0.documentID, data: $0.data())
+                }
+                self.updateUrgentBanner()
+            }
+    }
+
+    // Picks the highest-priority contract to show in the banner.
+    // Dispute takes priority over quality-approved.
+    private func updateUrgentBanner() {
+        if let contract = disputeContract {
+            urgentContract = contract
+            urgentContractMessage = "Buyer raised a dispute on Contract \(contract.contractRef). Review and respond."
+            unreadNotificationCount = 1
+        } else if let contract = approvedContract {
+            urgentContract = contract
+            urgentContractMessage = "Buyer approved quality on Contract \(contract.contractRef). Confirm handover to release funds."
+            unreadNotificationCount = 1
+        } else {
+            urgentContract = nil
+            urgentContractMessage = nil
+            unreadNotificationCount = 0
+        }
     }
 
     // MARK: - Firebase Fetch Logic

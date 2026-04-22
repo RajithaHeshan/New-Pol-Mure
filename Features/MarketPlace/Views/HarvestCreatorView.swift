@@ -8,10 +8,10 @@ struct HarvestCreatorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background
+               
                 Color(UIColor.systemGroupedBackground).ignoresSafeArea()
                 
-                // Scrollable Content
+                
                 ScrollView {
                     VStack(spacing: 24) {
                         photoUploadSection

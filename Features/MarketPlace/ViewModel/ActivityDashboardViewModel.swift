@@ -3,6 +3,7 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import UserNotifications
 
 
 private final class ActivityListenerBox {
@@ -128,12 +129,92 @@ class ActivityDashboardViewModel {
                     return
                 }
 
-                self.incomingOffers = snapshot?.documents.compactMap {
+                let updated = snapshot?.documents.compactMap {
                     Offer(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
+                // Fire notification only for genuinely new pending offers (not on first load)
+                if !self.incomingOffers.isEmpty {
+                    let existingIDs = Set(self.incomingOffers.map { $0.id })
+                    for offer in updated where !existingIDs.contains(offer.id) && offer.status == "pending" {
+                        self.scheduleNewOfferNotification(offer: offer)
+                    }
+                }
+
+                self.incomingOffers = updated
                 self.isLoadingOffers = false
             }
+    }
+
+    // MARK: - Accept Offer → creates a Contract and marks offer accepted
+    func acceptOffer(_ offer: Offer) {
+        let db = Firestore.firestore()
+
+        Task {
+            do {
+                // Mark the offer as accepted
+                try await db.collection("offers").document(offer.id)
+                    .updateData(["status": "accepted"])
+
+                // Fetch buyer name for the contract record
+                let buyerDoc   = try? await db.collection("users").document(currentBuyerID).getDocument()
+                let buyerName  = buyerDoc?.data()?["fullName"] as? String ?? ""
+
+                // Create a contract in escrow
+                let contractRef = "#\(Int.random(in: 1000...9999))"
+                let contractData: [String: Any] = [
+                    "contractRef": contractRef,
+                    "buyerID":     currentBuyerID,
+                    "buyerName":   buyerName,
+                    "sellerID":    offer.sellerID,
+                    "sellerName":  offer.sellerName,
+                    "status":      "escrow",
+                    "amount":      offer.amount,
+                    "createdAt":   Timestamp()
+                ]
+                try await db.collection("contracts").addDocument(data: contractData)
+
+            } catch {
+                print("Accept offer error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Decline Offer → marks offer declined
+    func declineOffer(_ offer: Offer) {
+        Task {
+            do {
+                try await Firestore.firestore()
+                    .collection("offers")
+                    .document(offer.id)
+                    .updateData(["status": "declined"])
+            } catch {
+                print("Decline offer error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Local Push Notification (Inbound Offer Alert for Buyer)
+    private func scheduleNewOfferNotification(offer: Offer) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = "New Pitch from a Seller!"
+            content.body  = "\(offer.sellerName) offered Rs \(String(format: "%.0f", offer.amount)). Tap to Accept or Decline in Activity → Offers."
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "inbound-offer-\(offer.id)",
+                content: content,
+                trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("Inbound offer notification error: \(error.localizedDescription)") }
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
     // MARK: - Tab 2: Transactions Listener

@@ -57,6 +57,7 @@ struct MetricCard: View {
 
 struct UrgentActionBanner: View {
     let message: String
+    let onVerify: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -71,7 +72,7 @@ struct UrgentActionBanner: View {
             Text(message)
                 .font(.subheadline)
 
-            Button(action: {}) {
+            Button(action: onVerify) {
                 Text("Verify Quality")
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
@@ -216,9 +217,9 @@ struct BuyerRowCard: View {
 }
 
 // MARK: - Temporary Placeholders
-struct SellerPerformanceView: View {
-    var body: some View { Text("Seller Analytics Placeholder").navigationTitle("Performance") }
-}
+//struct SellerPerformanceView: View {
+//    var body: some View { Text("Seller Analytics Placeholder").navigationTitle("Performance") }
+//}
 
 //struct LiveOfferView: View {
 //    let buyer: RegisteredBuyer

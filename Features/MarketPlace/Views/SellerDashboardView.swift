@@ -4,6 +4,7 @@ import MapKit
 
 struct SellerDashboardView: View {
     @State private var viewModel = SellerDashboardViewModel()
+    @State private var navigateToContract: Contract? = nil
 
     var body: some View {
         NavigationStack {
@@ -36,8 +37,10 @@ struct SellerDashboardView: View {
                     .padding(.top, 10)
 
                     if let message = viewModel.urgentContractMessage {
-                        UrgentActionBanner(message: message)
-                            .padding(.horizontal)
+                        UrgentActionBanner(message: message) {
+                            navigateToContract = viewModel.urgentContract
+                        }
+                        .padding(.horizontal)
                     }
 
                     Divider().padding(.vertical, 8)
@@ -275,6 +278,9 @@ struct SellerDashboardView: View {
             }
             .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
                 SellerFullScreenLocationPicker(searchCenter: $viewModel.searchCenter, searchRadius: $viewModel.searchRadius, buyers: viewModel.allBuyers)
+            }
+            .navigationDestination(item: $navigateToContract) { contract in
+                SellerContractView(contract: contract)
             }
         }
     }

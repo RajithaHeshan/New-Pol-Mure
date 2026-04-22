@@ -266,12 +266,12 @@ struct PresentationDebugTools: View {
     }
 }
 
-struct MarketAnalyticsView: View {
-    var body: some View {
-        Text("Market Analytics Placeholder")
-            .navigationTitle("Market Prices")
-    }
-}
+//struct MarketAnalyticsView: View {
+//    var body: some View {
+//        Text("Market Analytics Placeholder")
+//            .navigationTitle("Market Prices")
+//    }
+//}
 
 #Preview {
     NavigationStack {

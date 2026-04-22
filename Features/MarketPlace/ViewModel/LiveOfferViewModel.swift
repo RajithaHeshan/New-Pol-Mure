@@ -1,5 +1,3 @@
-// Location: New-Pol-Mure/Features/MarketPlace/ViewModels/LiveOfferViewModel.swift
-
 import SwiftUI
 import MapKit
 import FirebaseAuth
@@ -18,14 +16,14 @@ private final class OfferListenerBox {
 class LiveOfferViewModel {
     let buyer: RegisteredBuyer
 
-    // UI State
+   
     var userOfferInput: String = ""
     var currentLowestOffer: Double
     var currentLowestSellerID: String = ""
     var isUndercut: Bool = false
     var isPlacingOffer: Bool = false
 
-    // Current seller identity
+   
     private let currentSellerID: String
     private var currentSellerName: String = ""
 
@@ -39,7 +37,7 @@ class LiveOfferViewModel {
         attachOffersListener()
     }
 
-    // MARK: - Fetch Seller Name from Firestore (fullName saved during registration)
+   
     private func fetchSellerName() {
         guard !currentSellerID.isEmpty else { return }
         Task {
@@ -53,7 +51,6 @@ class LiveOfferViewModel {
         }
     }
 
-    // MARK: - Real-Time Offers Listener
     private func attachOffersListener() {
         listenerBox.listener = Firestore.firestore()
             .collection("offers")
@@ -70,14 +67,14 @@ class LiveOfferViewModel {
                     Offer(id: $0.documentID, data: $0.data())
                 } ?? []
 
-                // No offers yet — keep the market price default
+              
                 guard let lowestOffer = allOffers.sorted(by: { $0.amount < $1.amount }).first else {
                     return
                 }
 
                 let previousLeaderID = self.currentLowestSellerID
 
-                // Always update the displayed price on every snapshot
+               
                 self.currentLowestOffer    = lowestOffer.amount
                 self.currentLowestSellerID = lowestOffer.sellerID
 
@@ -100,7 +97,7 @@ class LiveOfferViewModel {
             }
     }
 
-    // MARK: - Pitching Logic
+   
     func incrementOffer(by amount: Double) {
         let currentInput = Double(userOfferInput) ?? currentLowestOffer
         userOfferInput = String(format: "%.0f", currentInput + amount)
@@ -120,7 +117,7 @@ class LiveOfferViewModel {
         }
     }
 
-    // MARK: - Send Offer to Firestore
+  
     func sendPitch() {
         guard let newOffer = Double(userOfferInput), newOffer > 0 else { return }
         isPlacingOffer = true
@@ -132,16 +129,46 @@ class LiveOfferViewModel {
                     "sellerID":   currentSellerID,
                     "sellerName": currentSellerName,
                     "amount":     newOffer,
+                    "status":     "pending",
                     "placedAt":   Timestamp()
                 ]
                 try await Firestore.firestore().collection("offers").addDocument(data: offerData)
                 userOfferInput = ""
                 isUndercut = false
+
+                // Notify the buyer locally that a new pitch has arrived
+                scheduleNewOfferNotification(amount: newOffer)
             } catch {
                 print("Error placing offer: \(error.localizedDescription)")
             }
             isPlacingOffer = false
         }
+    }
+
+   
+    private func scheduleNewOfferNotification(amount: Double) {
+        let buyerName = buyer.name
+        let buyerID   = buyer.id
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = "New Offer Received!"
+            content.body  = "\(self.currentSellerName) pitched Rs \(String(format: "%.0f", amount)) to you. Review it in Activity → Offers."
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "newoffer-\(buyerID)-\(Date().timeIntervalSince1970)",
+                content: content,
+                trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("New offer notification error: \(error.localizedDescription)") }
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     // MARK: - Local Push Notification (Undercut Alert)
@@ -176,8 +203,6 @@ class LiveOfferViewModel {
 
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
-
-    // MARK: - Debug / Simulation
     func simulateCheaperOffer() {
         let simulatedAmount = currentLowestOffer - 5.0
         currentLowestOffer = simulatedAmount

@@ -60,10 +60,9 @@ struct ActivityDashboardView: View {
                             } else {
                                 ForEach(viewModel.incomingOffers) { offer in
                                     DirectOfferRow(
-                                        sellerName: offer.sellerName,
-                                        location: "",
-                                        quantity: 0,
-                                        price: offer.amount
+                                        offer: offer,
+                                        onAccept:  { viewModel.acceptOffer(offer) },
+                                        onDecline: { viewModel.declineOffer(offer) }
                                     )
                                 }
                             }
@@ -107,7 +106,7 @@ struct ActivityDashboardView: View {
                                 EmptyActivityView(message: "No active contracts.")
                             } else {
                                 ForEach(viewModel.contracts) { contract in
-                                    NavigationLink(destination: Text("Active Contract View Placeholder")) {
+                                    NavigationLink(destination: ActiveContractView(contract: contract)) {
                                         ContractRow(
                                             contractNumber: contract.contractRef,
                                             sellerName: contract.sellerName,
@@ -185,10 +184,9 @@ struct PendingBidRow: View {
 }
 
 struct DirectOfferRow: View {
-    let sellerName: String
-    let location: String
-    let quantity: Int
-    let price: Double
+    let offer:     Offer
+    let onAccept:  () -> Void
+    let onDecline: () -> Void
 
     var body: some View {
         VStack(spacing: 16) {
@@ -199,52 +197,63 @@ struct DirectOfferRow: View {
                     .foregroundColor(.gray.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(sellerName)
+                    Text(offer.sellerName)
                         .font(.headline)
-                    if !location.isEmpty {
-                        HStack {
-                            Image(systemName: "mappin.and.ellipse")
-                                .font(.caption)
-                            Text(location)
-                                .font(.caption)
-                        }
+                    Text(offer.placedAt, style: .relative)
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                    }
                 }
 
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    if quantity > 0 {
-                        Text("\(quantity) Nuts")
-                            .font(.headline.bold())
-                    }
-                    Text("Rs \(price, specifier: "%.2f") / nut")
+                    Text("Rs \(offer.amount, specifier: "%.2f") / nut")
                         .font(.subheadline)
                         .foregroundColor(.green)
+
+                    // Status badge — shown after buyer acts
+                    if offer.status == "accepted" {
+                        Text("Accepted")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.blue.opacity(0.12))
+                            .foregroundColor(.blue)
+                            .clipShape(Capsule())
+                    } else if offer.status == "declined" {
+                        Text("Declined")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .clipShape(Capsule())
+                    }
                 }
             }
 
-       
-            HStack(spacing: 12) {
-                Button(action: { /* Reject Logic */ }) {
-                    Text("Decline")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.red.opacity(0.1))
-                        .foregroundColor(.red)
-                        .cornerRadius(8)
-                }
+            // Accept / Decline buttons — hidden once a decision is made
+            if offer.status == "pending" {
+                HStack(spacing: 12) {
+                    Button(action: onDecline) {
+                        Text("Decline")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .cornerRadius(8)
+                    }
 
-                Button(action: { /* Accept -> Moves to Contracts and locks Escrow */ }) {
-                    Text("Accept Pitch")
-                        .font(.subheadline.bold())
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+                    Button(action: onAccept) {
+                        Text("Accept Pitch")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
                 }
             }
         }

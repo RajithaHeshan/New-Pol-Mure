@@ -9,9 +9,9 @@ struct ContentView: View {
        
         if isLoggedIn {
             if userRole == "BUYER" || userRole == "Buyer" {
-                DiscoveryDashboardView()
+                BuyerTabView()
             } else {
-                SellerDashboardView()
+                SellerTabView()
             }
         } else {
             LoginView()

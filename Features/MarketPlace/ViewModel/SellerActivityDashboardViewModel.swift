@@ -3,6 +3,7 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import UserNotifications
 
 
 private final class SellerActivityListenerBox {
@@ -128,12 +129,92 @@ class SellerActivityDashboardViewModel {
                     return
                 }
 
-                self.incomingBids = snapshot?.documents.compactMap {
+                let updated = snapshot?.documents.compactMap {
                     Bid(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
+                // Fire notification only for genuinely new pending bids (not on first load)
+                if !self.incomingBids.isEmpty {
+                    let existingIDs = Set(self.incomingBids.map { $0.id })
+                    for bid in updated where !existingIDs.contains(bid.id) && bid.status == "pending" {
+                        self.scheduleNewBidNotification(bid: bid)
+                    }
+                }
+
+                self.incomingBids = updated
                 self.isLoadingBids = false
             }
+    }
+
+    // MARK: - Accept Bid → creates a Contract and marks bid accepted
+    func acceptBid(_ bid: Bid) {
+        let db = Firestore.firestore()
+
+        Task {
+            do {
+                // Mark the bid as accepted
+                try await db.collection("bids").document(bid.id)
+                    .updateData(["status": "accepted"])
+
+                // Fetch seller name for the contract record
+                let sellerDoc = try? await db.collection("users").document(currentSellerID).getDocument()
+                let sellerName = sellerDoc?.data()?["fullName"] as? String ?? ""
+
+                // Create a contract in escrow
+                let contractRef = "#\(Int.random(in: 1000...9999))"
+                let contractData: [String: Any] = [
+                    "contractRef": contractRef,
+                    "buyerID":     bid.bidderID,
+                    "buyerName":   bid.bidderName,
+                    "sellerID":    currentSellerID,
+                    "sellerName":  sellerName,
+                    "status":      "escrow",
+                    "amount":      bid.amount,
+                    "createdAt":   Timestamp()
+                ]
+                try await db.collection("contracts").addDocument(data: contractData)
+
+            } catch {
+                print("Accept bid error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Decline Bid → marks bid declined
+    func declineBid(_ bid: Bid) {
+        Task {
+            do {
+                try await Firestore.firestore()
+                    .collection("bids")
+                    .document(bid.id)
+                    .updateData(["status": "declined"])
+            } catch {
+                print("Decline bid error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Local Push Notification (Inbound Bid Alert for Seller)
+    private func scheduleNewBidNotification(bid: Bid) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = "New Bid on Your Harvest!"
+            content.body  = "\(bid.bidderName) placed Rs \(String(format: "%.0f", bid.amount)). Tap to Accept or Decline in Activity → Direct Bids."
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "inbound-bid-\(bid.id)",
+                content: content,
+                trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("Inbound bid notification error: \(error.localizedDescription)") }
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
     // MARK: - Tab 2: Transactions Listener

@@ -127,19 +127,49 @@ class LiveBiddingViewModel {
         Task {
             do {
                 let bidData: [String: Any] = [
-                    "sellerID": lot.id,
-                    "bidderID": currentBuyerID,
+                    "sellerID":   lot.id,
+                    "bidderID":   currentBuyerID,
                     "bidderName": currentBuyerName,
-                    "amount": newBid,
-                    "placedAt": Timestamp()
+                    "amount":     newBid,
+                    "status":     "pending",
+                    "placedAt":   Timestamp()
                 ]
                 try await Firestore.firestore().collection("bids").addDocument(data: bidData)
                 userBidInput = ""
+
+                // Notify the seller locally that a new bid has arrived
+                scheduleNewBidNotification(amount: newBid)
             } catch {
                 print("Error placing bid: \(error.localizedDescription)")
             }
             isPlacingBid = false
         }
+    }
+
+    // MARK: - Local Push Notification (New Bid Alert — fires on seller's device)
+    private func scheduleNewBidNotification(amount: Double) {
+        let sellerName = lot.sellerInitial
+        let lotID      = lot.id
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+
+            let content = UNMutableNotificationContent()
+            content.title = "New Bid Received!"
+            content.body  = "\(self.currentBuyerName) placed Rs \(String(format: "%.0f", amount)) on your lot. Review it in Activity → Direct Bids."
+            content.sound = .default
+
+            let request = UNNotificationRequest(
+                identifier: "newbid-\(lotID)-\(Date().timeIntervalSince1970)",
+                content: content,
+                trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("New bid notification error: \(error.localizedDescription)") }
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     // MARK: - Local Push Notification (Outbid Alert)
