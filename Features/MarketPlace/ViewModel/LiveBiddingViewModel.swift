@@ -1,8 +1,6 @@
-
 import SwiftUI
 import FirebaseFirestore
 import UserNotifications
-
 
 private final class ListenerBox {
     var listener: ListenerRegistration?
@@ -93,7 +91,6 @@ class LiveBiddingViewModel {
             }
     }
 
-    // MARK: - Bid Actions
     func incrementBid(by amount: Double) {
         let currentInput = Double(userBidInput) ?? currentHighestBid
         userBidInput = String(format: "%.0f", currentInput + amount)

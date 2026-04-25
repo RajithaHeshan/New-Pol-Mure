@@ -1,9 +1,7 @@
-
 import SwiftUI
 import MapKit
 import FirebaseFirestore
 import UserNotifications
-
 
 private final class OfferListenerBox {
     var listener: ListenerRegistration?
