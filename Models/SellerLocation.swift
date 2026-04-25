@@ -33,6 +33,7 @@ struct SellerLocation: Identifiable, Hashable {
     func toHarvestLot(currentBid: Double) -> HarvestLot {
         HarvestLot(
             id: id,
+            sellerID: id,
             sellerInitial: sellerName,
             propertyName: "",
             locationName: locationName,

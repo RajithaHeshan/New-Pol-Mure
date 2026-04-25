@@ -4,17 +4,17 @@ import Foundation
 import FirebaseFirestore
 
 struct Bid: Identifiable {
-    let id: String              // Firestore document ID
-    let sellerID: String        // Seller's user document ID (links to HarvestLot.id)
-    let bidderID: String        
+    let id: String
+    let harvestID: String   // Harvest document ID — used by LiveBiddingViewModel listener
+    let sellerID: String    // Seller's user ID — used by SellerActivityDashboard
+    let bidderID: String
     let bidderName: String
     let amount: Double
     let placedAt: Date
-    let status: String          // "pending" | "accepted" | "declined"
+    let status: String      // "pending" | "accepted" | "declined"
 
     init?(id: String, data: [String: Any]) {
         guard
-            let sellerID   = data["sellerID"]   as? String,
             let bidderID   = data["bidderID"]   as? String,
             let bidderName = data["bidderName"] as? String,
             let amount     = data["amount"]     as? Double,
@@ -22,7 +22,8 @@ struct Bid: Identifiable {
         else { return nil }
 
         self.id         = id
-        self.sellerID   = sellerID
+        self.harvestID  = data["harvestID"] as? String ?? ""
+        self.sellerID   = data["sellerID"]  as? String ?? ""
         self.bidderID   = bidderID
         self.bidderName = bidderName
         self.amount     = amount

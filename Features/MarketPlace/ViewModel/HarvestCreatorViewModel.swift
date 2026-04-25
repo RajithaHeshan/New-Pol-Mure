@@ -237,6 +237,7 @@ struct HarvestLotItem: Identifiable {
     func toHarvestLot() -> HarvestLot {
         HarvestLot(
             id: id,
+            sellerID: sellerID,
             sellerInitial: sellerName,
             propertyName: propertyName,
             locationName: locationName,

@@ -136,31 +136,37 @@ class DiscoveryDashboardViewModel {
         }
     }
 
-    // MARK: - Real-Time Bids Listener (Latest highest bid per seller)
+    // MARK: - Real-Time Bids Listener
+    // Groups by sellerID (for registered seller bids) and harvestID (for harvest bids)
     private func attachBidsListener() {
         bidsListener = Firestore.firestore()
             .collection("bids")
             .addSnapshotListener { [weak self] snapshot, _ in
                 guard let self, let docs = snapshot?.documents else { return }
 
-                // Group by sellerID and keep the highest amount
                 var bids: [String: Double] = [:]
                 for doc in docs {
                     let data = doc.data()
-                    guard
-                        let sellerID = data["sellerID"] as? String,
-                        let amount = data["amount"] as? Double
-                    else { continue }
+                    guard let amount = data["amount"] as? Double else { continue }
 
-                    if (bids[sellerID] ?? 0) < amount {
-                        bids[sellerID] = amount
+                    // Index by harvestID for harvest lot bids
+                    if let harvestID = data["harvestID"] as? String, !harvestID.isEmpty {
+                        if (bids[harvestID] ?? 0) < amount {
+                            bids[harvestID] = amount
+                        }
+                    }
+                    // Index by sellerID for registered-seller bids
+                    if let sellerID = data["sellerID"] as? String, !sellerID.isEmpty {
+                        if (bids[sellerID] ?? 0) < amount {
+                            bids[sellerID] = amount
+                        }
                     }
                 }
                 self.highestBids = bids
             }
     }
 
-    // MARK: - Highest Bid Helper
+    // MARK: - Highest Bid Helpers
     func highestBid(for seller: SellerLocation) -> Double {
         highestBids[seller.id] ?? 0.0
     }

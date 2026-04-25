@@ -286,15 +286,16 @@ struct PresentationDebugTools: View {
 #Preview {
     NavigationStack {
         LiveBiddingView(lot: HarvestLot(
-            id: "preview-seller-id",
+            id: "preview-harvest-id",
+            sellerID: "preview-seller-id",
             sellerInitial: "M. Silva",
-            propertyName: "Silva Estate",
-            locationName: "Madampe",
-            coordinate: CLLocationCoordinate2D(latitude: 7.4984, longitude: 79.8441),
-            quantity: 10000,
-            qualityGrade: "Premium (Export Quality)",
+            propertyName: "Kandy1",
+            locationName: "William Gopallawa Mawatha, Kandy",
+            coordinate: CLLocationCoordinate2D(latitude: 7.2906, longitude: 80.6337),
+            quantity: 200,
+            qualityGrade: "Standard (Local Market)",
             currentBid: 95.0,
-            endDate: Date().addingTimeInterval(86400)
+            endDate: Date().addingTimeInterval(86400 * 7)
         ))
     }
 }

@@ -46,10 +46,11 @@ class LiveBiddingViewModel {
         }
     }
 
+    // Listens on bids for this specific harvest document ID
     private func attachBidsListener() {
         listenerBox.listener = Firestore.firestore()
             .collection("bids")
-            .whereField("sellerID", isEqualTo: lot.id)
+            .whereField("harvestID", isEqualTo: lot.id)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -110,7 +111,8 @@ class LiveBiddingViewModel {
         Task {
             do {
                 let bidData: [String: Any] = [
-                    "sellerID":   lot.id,
+                    "harvestID":  lot.id,        // harvest doc ID — for real-time listener in this view
+                    "sellerID":   lot.sellerID,  // seller's user ID — for SellerActivityDashboard
                     "bidderID":   currentBuyerID,
                     "bidderName": currentBuyerName,
                     "amount":     newBid,
