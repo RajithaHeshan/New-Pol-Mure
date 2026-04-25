@@ -27,6 +27,10 @@ class ActiveContractViewModel {
     let sellerName:  String
     let sellerID:    String
     let buyerID:     String
+    let buyerName:   String
+    let quantity:    Int
+    let contractLocationName: String
+    let contractSource: String  // "bid" or "offer"
     var sellerPhone:        String = ""
     var sellerLocationName: String = ""
     var sellerYield:        String = ""
@@ -51,24 +55,32 @@ class ActiveContractViewModel {
     private let contractListenerBox = ContractListenerBox()
 
     init(contract: Contract) {
-        self.contractID  = contract.id
-        self.contractRef = contract.contractRef
-        self.sellerName  = contract.sellerName
-        self.sellerID    = contract.sellerID
-        self.buyerID     = contract.buyerID
-        self.amount      = contract.amount
+        self.contractID           = contract.id
+        self.contractRef          = contract.contractRef
+        self.sellerName           = contract.sellerName
+        self.sellerID             = contract.sellerID
+        self.buyerID              = contract.buyerID
+        self.buyerName            = contract.buyerName
+        self.quantity             = contract.quantity
+        self.contractLocationName = contract.locationName
+        self.contractSource       = contract.source
+        self.amount               = contract.amount
 
-        // Seed FSM state from initial snapshot
         self.currentState       = Self.mapStatus(contract.status)
         self.isLocationRevealed = contract.status != "escrow" && contract.status != "bidAccepted" && contract.status != ""
 
-        // Restore persisted inspection date — if it's in the past, use a fresh future default
         if let savedDate = contract.inspectionDate {
             self.inspectionDate    = savedDate
             self.pendingPickerDate = savedDate > Date() ? savedDate : Date().addingTimeInterval(3600)
         }
 
-        fetchSellerProfile(sellerID: contract.sellerID)
+        // If contract was from a harvest bid, seed the harvest's exact coordinates directly.
+        // fetchSellerProfile will still run to get phone/yield, but won't overwrite coordinates.
+        if let lat = contract.harvestLatitude, let lng = contract.harvestLongitude {
+            self.sellerCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+        }
+
+        fetchSellerProfile(sellerID: contract.sellerID, useProfileCoordinate: contract.harvestLatitude == nil)
         fetchBuyerCoordinate(buyerID: contract.buyerID)
         attachContractListener()
     }
@@ -110,8 +122,9 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Fetch Seller Profile: location, phone, yield
-    private func fetchSellerProfile(sellerID: String) {
+    // MARK: - Fetch Seller Profile: phone, yield, and optionally coordinates
+    // useProfileCoordinate = false when the contract already has harvest coordinates
+    private func fetchSellerProfile(sellerID: String, useProfileCoordinate: Bool = true) {
         Task {
             let doc = try? await Firestore.firestore()
                 .collection("users")
@@ -119,7 +132,10 @@ class ActiveContractViewModel {
                 .getDocument()
             guard let data = doc?.data() else { return }
 
-            if let lat = data["latitude"] as? Double,
+            // Only overwrite sellerCoordinate with the seller's home location
+            // when this is a direct registered-seller bid (not a harvest bid).
+            if useProfileCoordinate,
+               let lat = data["latitude"] as? Double,
                let lng = data["longitude"] as? Double {
                 sellerCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
             }
@@ -180,15 +196,54 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Approve Quality → signals seller to verify; seller confirms handover to complete
+    // MARK: - Approve Quality → advances contract and writes completed transactions for both parties
     func releaseFundsSimulation() {
         isReleasingFunds = true
         withAnimation { currentState = .paymentPending }
 
         Task {
-            try? await Firestore.firestore()
-                .collection("contracts")
-                .document(contractID)
+            let db = Firestore.firestore()
+            let now = Timestamp()
+            let fee = amount * 0.02  // 2% platform fee
+            let loc = contractLocationName.isEmpty ? sellerLocationName : contractLocationName
+            let pricePerNut = quantity > 0 ? amount / Double(quantity) : amount
+
+            // Buyer transaction — outgoing payment
+            let buyerTx: [String: Any] = [
+                "contractRef":    contractRef,
+                "buyerID":        buyerID,
+                "buyerName":      buyerName,
+                "sellerID":       sellerID,
+                "sellerName":     sellerName,
+                "quantity":       quantity,
+                "pricePerNut":    pricePerNut,
+                "amount":         amount,
+                "transactionFee": fee,
+                "locationName":   loc,
+                "source":         contractSource,
+                "isCredit":       false,
+                "completedAt":    now
+            ]
+            // Seller transaction — incoming payment
+            let sellerTx: [String: Any] = [
+                "contractRef":    contractRef,
+                "buyerID":        buyerID,
+                "buyerName":      buyerName,
+                "sellerID":       sellerID,
+                "sellerName":     sellerName,
+                "quantity":       quantity,
+                "pricePerNut":    pricePerNut,
+                "amount":         amount,
+                "transactionFee": fee,
+                "locationName":   loc,
+                "source":         contractSource,
+                "isCredit":       true,
+                "completedAt":    now
+            ]
+
+            try? await db.collection("transactions").addDocument(data: buyerTx)
+            try? await db.collection("transactions").addDocument(data: sellerTx)
+            try? await db.collection("contracts").document(contractID)
                 .updateData(["status": "qualityApproved"])
 
             isReleasingFunds = false

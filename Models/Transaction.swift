@@ -1,33 +1,46 @@
-// Location: New-Pol-Mure/Models/Transaction.swift
-
 import Foundation
 import FirebaseFirestore
 
 struct Transaction: Identifiable {
-    let id: String              // Firestore document ID
+    let id: String
+    let contractRef: String
     let buyerID: String
-    let sellerID: String        // Present so both buyer and seller can filter their own records
-    let description: String
+    let buyerName: String
+    let sellerID: String
+    let sellerName: String
+    let quantity: Int
+    let pricePerNut: Double
     let amount: Double
-    let isCredit: Bool          // true = refund/incoming, false = payment/outgoing
-    let date: Date
+    let transactionFee: Double
+    let locationName: String
+    let isCredit: Bool
+    let completedAt: Date
+    let source: String  // "bid" or "offer" — set at transaction creation time
+
+    var netAmount: Double { isCredit ? amount - transactionFee : amount + transactionFee }
 
     init?(id: String, data: [String: Any]) {
         guard
-            let buyerID      = data["buyerID"]     as? String,
-            let sellerID     = data["sellerID"]    as? String,
-            let description  = data["description"] as? String,
-            let amount       = data["amount"]      as? Double,
-            let isCredit     = data["isCredit"]    as? Bool,
-            let date         = (data["date"]       as? Timestamp)?.dateValue()
+            let buyerID    = data["buyerID"]    as? String,
+            let sellerID   = data["sellerID"]   as? String,
+            let amount     = data["amount"]     as? Double,
+            let isCredit   = data["isCredit"]   as? Bool,
+            let completedAt = (data["completedAt"] as? Timestamp)?.dateValue()
         else { return nil }
 
-        self.id          = id
-        self.buyerID     = buyerID
-        self.sellerID    = sellerID
-        self.description = description
-        self.amount      = amount
-        self.isCredit    = isCredit
-        self.date        = date
+        self.id             = id
+        self.contractRef    = data["contractRef"]   as? String ?? ""
+        self.buyerID        = buyerID
+        self.buyerName      = data["buyerName"]     as? String ?? ""
+        self.sellerID       = sellerID
+        self.sellerName     = data["sellerName"]    as? String ?? ""
+        self.quantity       = data["quantity"]      as? Int    ?? 0
+        self.pricePerNut    = data["pricePerNut"]   as? Double ?? 0
+        self.amount         = amount
+        self.transactionFee = data["transactionFee"] as? Double ?? 0
+        self.locationName   = data["locationName"]  as? String ?? ""
+        self.isCredit       = isCredit
+        self.completedAt    = completedAt
+        self.source         = data["source"]        as? String ?? "bid"
     }
 }

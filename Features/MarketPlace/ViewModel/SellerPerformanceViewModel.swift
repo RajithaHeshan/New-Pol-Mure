@@ -1,7 +1,6 @@
 // Location: New-Pol-Mure/Features/Marketplace/ViewModels/SellerPerformanceViewModel.swift
 
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 
 private final class PerformanceListenerBox {
@@ -50,7 +49,7 @@ class SellerPerformanceViewModel {
     private let offersListenerBox       = PerformanceListenerBox()
 
     init() {
-        self.currentSellerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentSellerID = AuthManager.shared.currentUserID
         attachTransactionsListener()
         attachContractsListener()
         attachOffersListener()
@@ -153,11 +152,10 @@ class SellerPerformanceViewModel {
         var pitchBuckets:   [String: Double] = [:]
 
         for tx in allTransactions {
-            let periodKey = periodLabel(for: tx.date, calendar: calendar, now: now)
+            let periodKey = periodLabel(for: tx.completedAt, calendar: calendar, now: now)
             guard !periodKey.isEmpty else { continue }
 
-            // Classify by description keyword
-            if tx.description.lowercased().contains("pitch") || tx.description.lowercased().contains("offer") {
+            if tx.source == "offer" {
                 pitchBuckets[periodKey, default: 0] += tx.amount
             } else {
                 auctionBuckets[periodKey, default: 0] += tx.amount

@@ -1,7 +1,6 @@
 // Location: New-Pol-Mure/Features/MarketPlace/ViewModels/BuyerPerformanceViewModel.swift
 
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 
 private final class BuyerPerformanceListenerBox {
@@ -50,7 +49,7 @@ class BuyerPerformanceViewModel {
     private let bidsListenerBox         = BuyerPerformanceListenerBox()
 
     init() {
-        self.currentBuyerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentBuyerID = AuthManager.shared.currentUserID
         attachTransactionsListener()
         attachContractsListener()
         attachBidsListener()
@@ -166,10 +165,10 @@ class BuyerPerformanceViewModel {
         var offersBuckets: [String: Double] = [:]
 
         for tx in allTransactions {
-            let periodKey = periodLabel(for: tx.date, calendar: calendar, now: now)
+            let periodKey = periodLabel(for: tx.completedAt, calendar: calendar, now: now)
             guard !periodKey.isEmpty else { continue }
 
-            if tx.description.lowercased().contains("offer") || tx.description.lowercased().contains("pitch") {
+            if tx.source == "offer" {
                 offersBuckets[periodKey, default: 0] += tx.amount
             } else {
                 bidsBuckets[periodKey, default: 0] += tx.amount

@@ -84,20 +84,15 @@ struct SellerActivityDashboardView: View {
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 40)
                             } else if viewModel.transactions.isEmpty {
-                                SellerEmptyActivityView(message: "No transactions found.")
+                                SellerEmptyActivityView(message: "No completed transactions yet.")
                             } else {
                                 ForEach(viewModel.transactions) { tx in
-                                    SellerTransactionRow(
-                                        date: viewModel.formattedDate(tx.date),
-                                        description: tx.description,
-                                        amount: tx.amount,
-                                        isCredit: tx.isCredit
-                                    )
+                                    SellerTransactionDetailCard(tx: tx)
                                 }
                             }
 
                         } else {
-                            // CONTRACTS
+                         
                             if viewModel.isLoadingContracts {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
@@ -256,7 +251,7 @@ struct SellerDirectBidRow: View {
                 }
             }
 
-            // Accept / Decline buttons — hidden once a decision is made
+            
             if bid.status == "pending" {
                 HStack(spacing: 12) {
                     Button(action: onDecline) {
@@ -288,33 +283,78 @@ struct SellerDirectBidRow: View {
     }
 }
 
-// NEW COMPONENT: Seller Transaction Row
-struct SellerTransactionRow: View {
-    let date: String
-    let description: String
-    let amount: Double
-    let isCredit: Bool
+
+struct SellerTransactionDetailCard: View {
+    let tx: Transaction
+
+    private var dateTimeString: String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: tx.completedAt)
+    }
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(description)
-                    .font(.headline)
-                Text(date)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header strip
+            HStack {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Funds Received")
+                        .font(.headline)
+                    Text("Contract \(tx.contractRef)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("+ Rs \(tx.amount, specifier: "%.0f")")
+                        .font(.title3.bold())
+                        .foregroundColor(.green)
+                    Text("Net Rs \(tx.netAmount, specifier: "%.0f")")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
+            .padding()
 
-            Spacer()
+            Divider().padding(.horizontal)
 
-            Text("\(isCredit ? "+" : "-") Rs \(amount, specifier: "%.2f")")
-                .font(.title3.bold())
-                .foregroundColor(isCredit ? .green : .primary)
+            VStack(spacing: 10) {
+                txRow(icon: "building.2.fill", label: "Buyer", value: tx.buyerName)
+                txRow(icon: "leaf.fill", label: "Quantity", value: "\(tx.quantity) Coconuts")
+                txRow(icon: "scalemass.fill", label: "Price / Nut", value: "Rs \(String(format: "%.2f", tx.pricePerNut))")
+                txRow(icon: "percent", label: "Platform Fee (2%)", value: "Rs \(String(format: "%.2f", tx.transactionFee))")
+                if !tx.locationName.isEmpty {
+                    txRow(icon: "mappin.and.ellipse", label: "Location", value: tx.locationName)
+                }
+                txRow(icon: "calendar", label: "Completed", value: dateTimeString)
+            }
+            .padding()
         }
-        .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(12)
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green.opacity(0.2), lineWidth: 1))
         .padding(.horizontal)
+    }
+
+    private func txRow(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(width: 16)
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption.bold())
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.trailing)
+        }
     }
 }
 

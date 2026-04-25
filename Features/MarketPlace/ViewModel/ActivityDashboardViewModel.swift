@@ -159,9 +159,11 @@ class ActivityDashboardViewModel {
                 let buyerDoc   = try? await db.collection("users").document(currentBuyerID).getDocument()
                 let buyerName  = buyerDoc?.data()?["fullName"] as? String ?? ""
 
-                // Create a contract in escrow
+                // Fetch seller profile for quantity and location
+                let sellerDoc = try? await db.collection("users").document(offer.sellerID).getDocument()
+
                 let contractRef = "#\(Int.random(in: 1000...9999))"
-                let contractData: [String: Any] = [
+                var contractData: [String: Any] = [
                     "contractRef": contractRef,
                     "buyerID":     currentBuyerID,
                     "buyerName":   buyerName,
@@ -169,8 +171,13 @@ class ActivityDashboardViewModel {
                     "sellerName":  offer.sellerName,
                     "status":      "escrow",
                     "amount":      offer.amount,
+                    "source":      "offer",
                     "createdAt":   Timestamp()
                 ]
+                if let yield = sellerDoc?.data()?["typicalYield"] as? String,
+                   let qty = Int(yield) { contractData["quantity"] = qty }
+                if let loc = sellerDoc?.data()?["locationName"] as? String { contractData["locationName"] = loc }
+
                 try await db.collection("contracts").addDocument(data: contractData)
 
             } catch {
@@ -224,6 +231,7 @@ class ActivityDashboardViewModel {
         transactionsListenerBox.listener = Firestore.firestore()
             .collection("transactions")
             .whereField("buyerID", isEqualTo: currentBuyerID)
+            .whereField("isCredit", isEqualTo: false)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -235,7 +243,7 @@ class ActivityDashboardViewModel {
 
                 self.transactions = snapshot?.documents.compactMap {
                     Transaction(id: $0.documentID, data: $0.data())
-                }.sorted { $0.date > $1.date } ?? []
+                }.sorted { $0.completedAt > $1.completedAt } ?? []
 
                 self.isLoadingTransactions = false
             }

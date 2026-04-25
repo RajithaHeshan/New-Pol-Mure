@@ -1,4 +1,3 @@
-// Location: New-Pol-Mure/Features/MarketPlace/ViewModels/SellerActivityDashboardViewModel.swift
 
 import SwiftUI
 import FirebaseFirestore
@@ -15,28 +14,28 @@ private final class SellerActivityListenerBox {
 @MainActor
 class SellerActivityDashboardViewModel {
 
-    // UI State (Defaulting to 0 so the first tab opens automatically)
+   
     var selectedTab: Int = 0
 
-    // MARK: - Tab 0: Active Pitches placed by this seller
+    
     var myOffers: [Offer] = []
 
-    // MARK: - Tab 1: Direct Bids inbound on this seller's harvest lots
+   
     var incomingBids: [Bid] = []
 
-    // MARK: - Tab 2: Financial transactions for this seller
+   
     var transactions: [Transaction] = []
 
-    // MARK: - Tab 3: Contracts involving this seller
+   
     var contracts: [Contract] = []
 
-    // MARK: - Lowest offer per buyerID — drives winning/underbid status in tab 0
+    
     var lowestOfferPerBuyer: [String: Double] = [:]
 
     // MARK: - Urgent buyer IDs — cross-referenced from urgentRequests collection
     var urgentBuyerIDs: Set<String> = []
 
-    // MARK: - Loading States
+    
     var isLoadingOffers       = false
     var isLoadingBids         = false
     var isLoadingTransactions = false
@@ -177,17 +176,14 @@ class SellerActivityDashboardViewModel {
 
         Task {
             do {
-                // Mark the bid as accepted
                 try await db.collection("bids").document(bid.id)
                     .updateData(["status": "accepted"])
 
-                // Fetch seller name for the contract record
                 let sellerDoc = try? await db.collection("users").document(currentSellerID).getDocument()
                 let sellerName = sellerDoc?.data()?["fullName"] as? String ?? ""
 
-                // Create a contract in escrow
                 let contractRef = "#\(Int.random(in: 1000...9999))"
-                let contractData: [String: Any] = [
+                var contractData: [String: Any] = [
                     "contractRef": contractRef,
                     "buyerID":     bid.bidderID,
                     "buyerName":   bid.bidderName,
@@ -195,8 +191,27 @@ class SellerActivityDashboardViewModel {
                     "sellerName":  sellerName,
                     "status":      "escrow",
                     "amount":      bid.amount,
+                    "source":      "bid",
                     "createdAt":   Timestamp()
                 ]
+
+                // For harvest bids: store harvest coordinates + quantity + location
+                if !bid.harvestID.isEmpty {
+                    let harvestDoc = try? await db.collection("harvestLots").document(bid.harvestID).getDocument()
+                    if let data = harvestDoc?.data() {
+                        if let lat = data["latitude"] as? Double, let lng = data["longitude"] as? Double {
+                            contractData["harvestLatitude"]  = lat
+                            contractData["harvestLongitude"] = lng
+                        }
+                        if let qty = data["quantity"] as? Int    { contractData["quantity"]     = qty }
+                        if let loc = data["locationName"] as? String { contractData["locationName"] = loc }
+                    }
+                } else {
+                    if let yield = sellerDoc?.data()?["typicalYield"] as? String,
+                       let qty = Int(yield) { contractData["quantity"] = qty }
+                    if let loc = sellerDoc?.data()?["locationName"] as? String { contractData["locationName"] = loc }
+                }
+
                 try await db.collection("contracts").addDocument(data: contractData)
 
             } catch {
@@ -205,7 +220,7 @@ class SellerActivityDashboardViewModel {
         }
     }
 
-    // MARK: - Decline Bid → marks bid declined
+  
     func declineBid(_ bid: Bid) {
         Task {
             do {
@@ -250,6 +265,7 @@ class SellerActivityDashboardViewModel {
         transactionsListenerBox.listener = Firestore.firestore()
             .collection("transactions")
             .whereField("sellerID", isEqualTo: currentSellerID)
+            .whereField("isCredit", isEqualTo: true)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -261,13 +277,13 @@ class SellerActivityDashboardViewModel {
 
                 self.transactions = snapshot?.documents.compactMap {
                     Transaction(id: $0.documentID, data: $0.data())
-                }.sorted { $0.date > $1.date } ?? []
+                }.sorted { $0.completedAt > $1.completedAt } ?? []
 
                 self.isLoadingTransactions = false
             }
     }
 
-    // MARK: - Tab 3: Contracts Listener
+  
     private func attachContractsListener() {
         guard !currentSellerID.isEmpty else { return }
         isLoadingContracts = true
@@ -292,7 +308,7 @@ class SellerActivityDashboardViewModel {
             }
     }
 
-    // MARK: - Date Formatter Helper
+   
     func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -300,7 +316,7 @@ class SellerActivityDashboardViewModel {
         return formatter.string(from: date)
     }
 
-    // MARK: - Contract Status Display Helper
+  
     func statusDisplayText(_ status: String) -> String {
         switch status {
         case "escrow":      return "Escrow Held"
