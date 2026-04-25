@@ -16,21 +16,15 @@ class LiveBiddingViewModel {
 
     let lot: HarvestLot
 
-   
     var userBidInput: String = ""
     var currentHighestBid: Double
     var currentHighestBidderID: String = ""
     var isOutbid: Bool = false
     var isPlacingBid: Bool = false
 
-   
     private let currentBuyerID: String
     private var currentBuyerName: String = ""
-
-   
     private let listenerBox = ListenerBox()
-
- 
     private var isFirstSnapshot: Bool = true
 
     init(lot: HarvestLot) {
@@ -41,7 +35,6 @@ class LiveBiddingViewModel {
         attachBidsListener()
     }
 
-    // MARK: - Fetch Buyer Name from Firestore (fullName saved during registration)
     private func fetchBuyerName() {
         guard !currentBuyerID.isEmpty else { return }
         Task {
@@ -55,7 +48,6 @@ class LiveBiddingViewModel {
         }
     }
 
-   
     private func attachBidsListener() {
         listenerBox.listener = Firestore.firestore()
             .collection("bids")
@@ -77,7 +69,6 @@ class LiveBiddingViewModel {
                     return
                 }
 
-        
                 if self.isFirstSnapshot {
                     self.currentHighestBid = topBid.amount
                     self.currentHighestBidderID = topBid.bidderID
@@ -89,19 +80,15 @@ class LiveBiddingViewModel {
                 self.currentHighestBid = topBid.amount
                 self.currentHighestBidderID = topBid.bidderID
 
-              
                 if topBid.bidderID == self.currentBuyerID {
                     self.isOutbid = false
                     return
                 }
 
-             
                 let currentBuyerHasBid = allBids.contains { $0.bidderID == self.currentBuyerID }
-                if currentBuyerHasBid {
-                    if topBid.bidderID != previousLeaderID {
-                        self.isOutbid = true
-                        self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName)
-                    }
+                if currentBuyerHasBid && topBid.bidderID != previousLeaderID && !self.isOutbid {
+                    self.isOutbid = true
+                    self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName)
                 }
             }
     }
@@ -135,8 +122,6 @@ class LiveBiddingViewModel {
                 ]
                 try await Firestore.firestore().collection("bids").addDocument(data: bidData)
                 userBidInput = ""
-
-                // Notify the seller locally that a new bid has arrived
                 scheduleNewBidNotification(amount: newBid)
             } catch {
                 print("Error placing bid: \(error.localizedDescription)")
@@ -145,71 +130,50 @@ class LiveBiddingViewModel {
         }
     }
 
-    // MARK: - Local Push Notification (New Bid Alert — fires on seller's device)
-    private func scheduleNewBidNotification(amount: Double) {
-        let sellerName = lot.sellerInitial
-        let lotID      = lot.id
-
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized else { return }
-
-            let content = UNMutableNotificationContent()
-            content.title = "New Bid Received!"
-            content.body  = "\(self.currentBuyerName) placed Rs \(String(format: "%.0f", amount)) on your lot. Review it in Activity → Direct Bids."
-            content.sound = .default
-
-            let request = UNNotificationRequest(
-                identifier: "newbid-\(lotID)-\(Date().timeIntervalSince1970)",
-                content: content,
-                trigger: nil
-            )
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error { print("New bid notification error: \(error.localizedDescription)") }
-            }
-        }
-
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-    }
-
-    // MARK: - Local Push Notification (Outbid Alert)
-    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
-        let sellerName = lot.sellerInitial
-        let lotID = lot.id
-
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized else {
-                print("Notifications not authorized — status: \(settings.authorizationStatus.rawValue)")
-                return
-            }
-
-            let content = UNMutableNotificationContent()
-            content.title = "You've Been Outbid!"
-            content.body = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
-            content.sound = .default
-
-            let request = UNNotificationRequest(
-                identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)",
-                content: content,
-                trigger: nil
-            )
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error {
-                    print("Notification error: \(error.localizedDescription)")
-                } else {
-                    print("Outbid notification scheduled successfully for \(bidderName)")
-                }
-            }
-        }
-
-        UINotificationFeedbackGenerator().notificationOccurred(.warning)
-    }
-
-    // MARK: - Debug / Simulation
     func simulateOutbid() {
         let simulatedAmount = currentHighestBid + 5.0
         currentHighestBid = simulatedAmount
         currentHighestBidderID = "simulated-other-buyer"
         isOutbid = true
         scheduleOutbidNotification(newAmount: simulatedAmount, bidderName: "Test Buyer")
+    }
+
+    private func scheduleNewBidNotification(amount: Double) {
+        let lotID = lot.id
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "New Bid Received!"
+            content.body  = "\(self.currentBuyerName) placed Rs \(String(format: "%.0f", amount)) on your lot. Review it in Activity → Direct Bids."
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: "newbid-\(lotID)-\(Date().timeIntervalSince1970)",
+                content: content, trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("New bid notification error: \(error.localizedDescription)") }
+            }
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
+        let sellerName = lot.sellerInitial
+        let lotID = lot.id
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "You've Been Outbid!"
+            content.body  = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
+            content.sound = .default
+            let request = UNNotificationRequest(
+                identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)",
+                content: content, trigger: nil
+            )
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("Notification error: \(error.localizedDescription)") }
+            }
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 }
