@@ -4,13 +4,14 @@ import Foundation
 import FirebaseFirestore
 
 struct Offer: Identifiable {
-    let id: String              // Firestore document ID
-    let buyerID: String         // Buyer's user document ID (the target buyer)
+    let id: String
+    let buyerID: String
     let sellerID: String
     let sellerName: String
     let amount: Double
     let placedAt: Date
     let status: String          // "pending" | "accepted" | "declined"
+    let isUrgentPitch: Bool
 
     init?(id: String, data: [String: Any]) {
         guard
@@ -21,12 +22,13 @@ struct Offer: Identifiable {
             let placedAt   = (data["placedAt"]  as? Timestamp)?.dateValue()
         else { return nil }
 
-        self.id         = id
-        self.buyerID    = buyerID
-        self.sellerID   = sellerID
-        self.sellerName = sellerName
-        self.amount     = amount
-        self.placedAt   = placedAt
-        self.status     = data["status"] as? String ?? "pending"
+        self.id             = id
+        self.buyerID        = buyerID
+        self.sellerID       = sellerID
+        self.sellerName     = sellerName
+        self.amount         = amount
+        self.placedAt       = placedAt
+        self.status         = data["status"]        as? String ?? "pending"
+        self.isUrgentPitch  = data["isUrgentPitch"] as? Bool   ?? false
     }
 }

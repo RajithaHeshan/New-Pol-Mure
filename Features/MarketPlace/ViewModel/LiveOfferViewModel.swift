@@ -29,10 +29,13 @@ class LiveOfferViewModel {
 
     private let listenerBox = OfferListenerBox()
 
-    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0) {
+    var isUrgentPitch: Bool = false
+
+    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0, isUrgentPitch: Bool = false) {
         self.buyer = buyer
         self.currentLowestOffer = currentMarketPrice
         self.currentSellerID = Auth.auth().currentUser?.uid ?? ""
+        self.isUrgentPitch = isUrgentPitch
         fetchSellerName()
         attachOffersListener()
     }
@@ -67,14 +70,14 @@ class LiveOfferViewModel {
                     Offer(id: $0.documentID, data: $0.data())
                 } ?? []
 
-              
+                // No offers yet — keep the market price default
                 guard let lowestOffer = allOffers.sorted(by: { $0.amount < $1.amount }).first else {
                     return
                 }
 
                 let previousLeaderID = self.currentLowestSellerID
 
-               
+                
                 self.currentLowestOffer    = lowestOffer.amount
                 self.currentLowestSellerID = lowestOffer.sellerID
 
@@ -84,10 +87,9 @@ class LiveOfferViewModel {
                     return
                 }
 
-                // Only alert if this seller has already placed at least one offer
-                // AND the leader just changed to someone else
+               
                 let thisSellerHasOffer = allOffers.contains { $0.sellerID == self.currentSellerID }
-                if thisSellerHasOffer && lowestOffer.sellerID != previousLeaderID {
+                if thisSellerHasOffer && lowestOffer.sellerID != previousLeaderID && !self.isUndercut {
                     self.isUndercut = true
                     self.scheduleUndercutNotification(
                         newAmount: lowestOffer.amount,
@@ -125,12 +127,13 @@ class LiveOfferViewModel {
         Task {
             do {
                 let offerData: [String: Any] = [
-                    "buyerID":    buyer.id,
-                    "sellerID":   currentSellerID,
-                    "sellerName": currentSellerName,
-                    "amount":     newOffer,
-                    "status":     "pending",
-                    "placedAt":   Timestamp()
+                    "buyerID":       buyer.id,
+                    "sellerID":      currentSellerID,
+                    "sellerName":    currentSellerName,
+                    "amount":        newOffer,
+                    "status":        "pending",
+                    "placedAt":      Timestamp(),
+                    "isUrgentPitch": isUrgentPitch
                 ]
                 try await Firestore.firestore().collection("offers").addDocument(data: offerData)
                 userOfferInput = ""
@@ -145,7 +148,7 @@ class LiveOfferViewModel {
         }
     }
 
-   
+    // MARK: - Local Push Notification (New Offer Alert — fires on buyer's device)
     private func scheduleNewOfferNotification(amount: Double) {
         let buyerName = buyer.name
         let buyerID   = buyer.id
@@ -171,7 +174,7 @@ class LiveOfferViewModel {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    // MARK: - Local Push Notification (Undercut Alert)
+    
     private func scheduleUndercutNotification(newAmount: Double, sellerName: String) {
         let buyerName = buyer.name
         let buyerID   = buyer.id

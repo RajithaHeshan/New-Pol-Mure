@@ -1,6 +1,5 @@
 import SwiftUI
 import MapKit
-import FirebaseAuth
 import FirebaseFirestore
 
 private final class DashboardListenerBox {
@@ -43,13 +42,17 @@ class SellerDashboardViewModel {
     // Live lowest offer per buyerID — drives the price badge on every buyer card
     var lowestOfferPerBuyer: [String: Double] = [:]
     private let offersListenerBox = DashboardListenerBox()
+    private let buyersListenerBox = DashboardListenerBox()
+    private let urgentRequestsListenerBox = DashboardListenerBox()
+
+    // Live urgent posts from urgentRequests collection
+    var urgentPosts: [UrgentRequest] = []
 
     // MARK: - Live Dashboard Metrics (replaces hardcoded values)
     var escrowTotal: Double = 0
     var activeOffersTotal: Double = 0
     var urgentContractMessage: String? = nil
     var urgentContract: Contract? = nil
-    private let metricsListenerBox   = DashboardListenerBox()
     private let contractListenerBox  = DashboardListenerBox()
     private let disputeListenerBox   = DashboardListenerBox()
 
@@ -59,11 +62,16 @@ class SellerDashboardViewModel {
 
     init() {
         fetchUserProfile()
-        fetchBuyers()
+        attachBuyersListener()
         attachOffersListener()
+        attachUrgentListeners()
+        attachUrgentRequestsListener()
+    }
+
+    // Called from .onAppear so listeners are (re)attached after auth is fully restored
+    func onAppear() {
         attachMetricsListener()
-        attachContractListener()
-        attachDisputeListener()
+        attachUrgentListeners()
     }
 
 
@@ -95,68 +103,69 @@ class SellerDashboardViewModel {
                 self.lowestOfferPerBuyer = map
 
                 // activeOffersTotal = sum of the lowest pitch won per buyer by this seller
-                guard let sellerID = Auth.auth().currentUser?.uid else { return }
+                let sellerID = AuthManager.shared.currentUserID
+                guard !sellerID.isEmpty else { return }
                 self.activeOffersTotal = allOffers
                     .filter { $0.sellerID == sellerID }
                     .reduce(0) { $0 + $1.amount }
             }
     }
 
-    // MARK: - Escrow Total from contracts collection
-    private func attachMetricsListener() {
-        guard let sellerID = Auth.auth().currentUser?.uid else { return }
-        metricsListenerBox.listener = Firestore.firestore()
-            .collection("contracts")
-            .whereField("sellerID", isEqualTo: sellerID)
-            .whereField("status", isEqualTo: "escrow")
+    // MARK: - Live Urgent Posts listener
+    private func attachUrgentRequestsListener() {
+        urgentRequestsListenerBox.listener = Firestore.firestore()
+            .collection("urgentRequests")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
                 if let error {
-                    print("Metrics listener error: \(error.localizedDescription)")
+                    print("urgentRequests listener error: \(error.localizedDescription)")
                     return
                 }
-                self.escrowTotal = snapshot?.documents.reduce(0.0) { sum, doc in
-                    sum + ((doc.data()["amount"] as? Double) ?? 0)
-                } ?? 0
+                self.urgentPosts = snapshot?.documents.compactMap {
+                    UrgentRequest(id: $0.documentID, data: $0.data())
+                }.sorted { $0.deadline < $1.deadline } ?? []
+                print("🔥 urgentPosts loaded: \(self.urgentPosts.count) posts")
             }
     }
 
-    // MARK: - Listener: qualityApproved contracts (buyer approved, seller must confirm handover)
-    private func attachContractListener() {
-        guard let sellerID = Auth.auth().currentUser?.uid else { return }
+    // MARK: - Escrow Total (reuses contractListenerBox — computed from same snapshot)
+    private func attachMetricsListener() {
+        // escrowTotal is now derived inside attachUrgentListeners from the same snapshot.
+        // Nothing to do here — kept for compatibility with onAppear call.
+    }
+
+    // MARK: - Urgent listener: single query on sellerID, filter status in Swift (no composite index needed)
+    private func attachUrgentListeners() {
+        let sellerID = AuthManager.shared.currentUserID
+        guard !sellerID.isEmpty else {
+            print("⚠️ attachUrgentListeners: currentUserID empty — will retry on onAppear")
+            return
+        }
+        print("✅ attachUrgentListeners: sellerID = \(sellerID)")
+
+        // Remove any existing listeners before re-attaching to avoid duplicates
+        contractListenerBox.listener?.remove()
+        disputeListenerBox.listener?.remove()
+
+        // Single-field query — no composite index required.
+        // We filter by status in Swift so Firestore never needs a multi-field index.
         contractListenerBox.listener = Firestore.firestore()
             .collection("contracts")
             .whereField("sellerID", isEqualTo: sellerID)
-            .whereField("status", isEqualTo: "qualityApproved")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
                 if let error {
-                    print("Contract listener error: \(error.localizedDescription)")
+                    print("Urgent contracts listener error: \(error.localizedDescription)")
                     return
                 }
-                self.approvedContract = snapshot?.documents.first.flatMap {
+                let allContracts = snapshot?.documents.compactMap {
                     Contract(id: $0.documentID, data: $0.data())
-                }
-                self.updateUrgentBanner()
-            }
-    }
+                } ?? []
+                print("🟢 contracts snapshot: \(allContracts.count) docs, statuses: \(allContracts.map { $0.status })")
 
-    // MARK: - Listener: disputed contracts (buyer raised dispute, seller must review)
-    private func attachDisputeListener() {
-        guard let sellerID = Auth.auth().currentUser?.uid else { return }
-        disputeListenerBox.listener = Firestore.firestore()
-            .collection("contracts")
-            .whereField("sellerID", isEqualTo: sellerID)
-            .whereField("status", isEqualTo: "dispute")
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self else { return }
-                if let error {
-                    print("Dispute contract listener error: \(error.localizedDescription)")
-                    return
-                }
-                self.disputeContract = snapshot?.documents.first.flatMap {
-                    Contract(id: $0.documentID, data: $0.data())
-                }
+                self.disputeContract  = allContracts.first { $0.status == "dispute" }
+                self.approvedContract = allContracts.first { $0.status == "qualityApproved" }
+                self.escrowTotal      = allContracts.filter { $0.status == "escrow" }.reduce(0) { $0 + $1.amount }
                 self.updateUrgentBanner()
             }
     }
@@ -181,7 +190,8 @@ class SellerDashboardViewModel {
 
     // MARK: - Firebase Fetch Logic
     func fetchUserProfile() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        let userId = AuthManager.shared.currentUserID
+        guard !userId.isEmpty else { return }
 
         Task {
             do {
@@ -202,66 +212,57 @@ class SellerDashboardViewModel {
         }
     }
 
-    // MARK: - Fetch Buyers from Firestore
-    func fetchBuyers() {
+    // MARK: - Live Buyers Listener (real-time so isUrgent changes appear immediately)
+    private func attachBuyersListener() {
         isLoadingBuyers = true
-
-        Task {
-            do {
-                let snapshot = try await Firestore.firestore()
-                    .collection("users")
-                    .whereField("role", isEqualTo: "BUYER")
-                    .getDocuments()
-
-                var buyers: [RegisteredBuyer] = []
-
-                for doc in snapshot.documents {
-                    let data = doc.data()
-
-                    guard
-                        let name = data["fullName"] as? String,
-                        let location = data["locationName"] as? String
-                    else { continue }
-
-                    let volume = data["typicalVolume"] as? String ?? "N/A"
-
-                    // Use stored coordinates if present, otherwise geocode locationName
-                    let coordinate: CLLocationCoordinate2D
-                    if let lat = data["latitude"] as? Double,
-                       let lng = data["longitude"] as? Double {
-                        coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                    } else {
-                        // Geocode the locationName and backfill Firestore so this only runs once
-                        if let resolved = await geocode(locationName: location) {
-                            coordinate = resolved
-                            try? await Firestore.firestore()
-                                .collection("users")
-                                .document(doc.documentID)
-                                .updateData(["latitude": resolved.latitude, "longitude": resolved.longitude])
-                        } else {
-                            continue
-                        }
-                    }
-
-                    buyers.append(RegisteredBuyer(
-                        id: doc.documentID,
-                        name: name,
-                        locationName: location,
-                        coordinate: coordinate,
-                        typicalVolume: volume,
-                        rating: data["rating"] as? Double ?? 0.0,
-                        isUrgent: data["isUrgent"] as? Bool ?? false
-                    ))
+        buyersListenerBox.listener = Firestore.firestore()
+            .collection("users")
+            .whereField("role", isEqualTo: "BUYER")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("Buyers listener error: \(error.localizedDescription)")
+                    self.isLoadingBuyers = false
+                    return
                 }
+                Task {
+                    var buyers: [RegisteredBuyer] = []
+                    for doc in snapshot?.documents ?? [] {
+                        let data = doc.data()
+                        guard
+                            let name     = data["fullName"]     as? String,
+                            let location = data["locationName"] as? String
+                        else { continue }
 
-                self.allBuyers = buyers
-                self.isLoadingBuyers = false
+                        let volume = data["typicalVolume"] as? String ?? "N/A"
+                        let coordinate: CLLocationCoordinate2D
+                        if let lat = data["latitude"] as? Double,
+                           let lng = data["longitude"] as? Double {
+                            coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                        } else {
+                            if let resolved = await self.geocode(locationName: location) {
+                                coordinate = resolved
+                                try? await Firestore.firestore()
+                                    .collection("users")
+                                    .document(doc.documentID)
+                                    .updateData(["latitude": resolved.latitude, "longitude": resolved.longitude])
+                            } else { continue }
+                        }
 
-            } catch {
-                print("Error fetching buyers from Firestore: \(error.localizedDescription)")
-                self.isLoadingBuyers = false
+                        buyers.append(RegisteredBuyer(
+                            id: doc.documentID,
+                            name: name,
+                            locationName: location,
+                            coordinate: coordinate,
+                            typicalVolume: volume,
+                            rating: data["rating"] as? Double ?? 0.0,
+                            isUrgent: data["isUrgent"] as? Bool ?? false
+                        ))
+                    }
+                    self.allBuyers = buyers
+                    self.isLoadingBuyers = false
+                }
             }
-        }
     }
 
 
@@ -309,7 +310,7 @@ class SellerDashboardViewModel {
         }
     }
 
-    // MARK: - Buyers Within Search Radius
+    // MARK: - Buyers Within Search Radius (All / High Capacity / Nearest to Me)
     var buyersInRadius: [RegisteredBuyer] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
 
@@ -321,8 +322,6 @@ class SellerDashboardViewModel {
         switch selectedFilter {
         case "High Capacity":
             results = results.filter { (Int($0.typicalVolume) ?? 0) >= 10000 }
-        case "Urgent Need":
-            results = results.filter { $0.isUrgent }
         case "Nearest to Me":
             results.sort { b1, b2 in
                 let loc1 = CLLocation(latitude: b1.coordinate.latitude, longitude: b1.coordinate.longitude)
@@ -336,7 +335,23 @@ class SellerDashboardViewModel {
         return results
     }
 
-  
+    // Build a RegisteredBuyer from an UrgentRequest — uses allBuyers for coordinate if available
+    func buyer(for post: UrgentRequest) -> RegisteredBuyer {
+        if let match = allBuyers.first(where: { $0.id == post.buyerID }) {
+            return match
+        }
+        // Fallback: build from urgentRequest data with default coordinate
+        return RegisteredBuyer(
+            id: post.buyerID,
+            name: post.buyerName,
+            locationName: post.location,
+            coordinate: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
+            typicalVolume: "\(post.quantity)",
+            rating: 0.0,
+            isUrgent: true
+        )
+    }
+
     var recommendedBuyers: [RegisteredBuyer] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allBuyers

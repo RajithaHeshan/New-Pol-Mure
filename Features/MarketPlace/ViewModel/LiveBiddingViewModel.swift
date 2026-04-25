@@ -1,6 +1,5 @@
 
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 import UserNotifications
 
@@ -37,7 +36,7 @@ class LiveBiddingViewModel {
     init(lot: HarvestLot) {
         self.lot = lot
         self.currentHighestBid = lot.currentBid
-        self.currentBuyerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentBuyerID = AuthManager.shared.currentUserID
         fetchBuyerName()
         attachBidsListener()
     }

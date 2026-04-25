@@ -1,4 +1,4 @@
-// Location: New-Pol-Mure/Features/Marketplace/Views/DisputeModalView.swift
+
 
 import SwiftUI
 
@@ -7,10 +7,11 @@ struct DisputeModalView: View {
     @State private var viewModel: DisputeModalViewModel
     @FocusState private var isInputFocused: Bool
 
-    // Local state for the form fields — avoids @Observable binding issues
+    
     @State private var selectedReason: String = "Quality (Rotten/Spoiled)"
     @State private var additionalNotes: String = ""
     @State private var counterOfferAmount: String = ""
+    @State private var localError: String? = nil
 
     init(contractID: String = "", originalBid: Double = 120.00) {
         _viewModel = State(initialValue: DisputeModalViewModel(contractID: contractID, originalBid: originalBid))
@@ -63,13 +64,21 @@ struct DisputeModalView: View {
                     Text("Renegotiate Price")
                 }
 
+                
                 Section {
                     Button(action: {
                         isInputFocused = false
+                        print("🔵 Submit button tapped — counterOfferAmount: '\(counterOfferAmount)'")
+                        let amount = counterOfferAmount.trimmingCharacters(in: .whitespaces)
+                        guard !amount.isEmpty, let value = Double(amount), value > 0 else {
+                            print("🔵 View guard failed — amount: '\(amount)'")
+                            localError = "Enter a counter-offer amount greater than 0."
+                            return
+                        }
                         viewModel.submitCounterOffer(
                             reason: selectedReason,
                             notes: additionalNotes,
-                            counterOffer: counterOfferAmount,
+                            counterOffer: amount,
                             onSuccess: { dismiss() }
                         )
                     }) {
@@ -86,8 +95,11 @@ struct DisputeModalView: View {
                     }
                     .disabled(viewModel.isSubmitting || viewModel.isCancelling)
                     .listRowBackground(Color.blue)
+                }
 
-                    Button(action: {
+               
+                Section {
+                    Button(role: .destructive, action: {
                         viewModel.cancelContractEntirely(onSuccess: { dismiss() })
                     }) {
                         if viewModel.isCancelling {
@@ -98,10 +110,12 @@ struct DisputeModalView: View {
                             Text("Cancel Contract Entirely")
                                 .font(.subheadline.bold())
                                 .frame(maxWidth: .infinity, alignment: .center)
-                                .foregroundColor(.red)
                         }
                     }
                     .disabled(viewModel.isSubmitting || viewModel.isCancelling)
+                } footer: {
+                    Text("This permanently cancels the contract and releases the escrow. This action cannot be undone.")
+                        .foregroundColor(.secondary)
                 }
             }
             .navigationTitle("Dispute Contract")
@@ -113,22 +127,13 @@ struct DisputeModalView: View {
                         .foregroundColor(.blue)
                 }
             }
-            .onTapGesture { isInputFocused = false }
             .alert("Error", isPresented: Binding(
-                get: { viewModel.submitError != nil },
-                set: { if !$0 { viewModel.submitError = nil } }
+                get: { localError != nil || viewModel.submitError != nil || viewModel.cancelError != nil },
+                set: { if !$0 { localError = nil; viewModel.submitError = nil; viewModel.cancelError = nil } }
             )) {
                 Button("OK", role: .cancel) {}
             } message: {
-                Text(viewModel.submitError ?? "")
-            }
-            .alert("Error", isPresented: Binding(
-                get: { viewModel.cancelError != nil },
-                set: { if !$0 { viewModel.cancelError = nil } }
-            )) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(viewModel.cancelError ?? "")
+                Text(localError ?? viewModel.submitError ?? viewModel.cancelError ?? "")
             }
         }
     }

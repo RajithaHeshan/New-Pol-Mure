@@ -1,7 +1,6 @@
 
 import SwiftUI
 import MapKit
-import FirebaseAuth
 import FirebaseFirestore
 import UserNotifications
 
@@ -40,16 +39,23 @@ class DiscoveryDashboardViewModel {
     var highestBids: [String: Double] = [:]
     private var bidsListener: ListenerRegistration?
 
+    // MARK: - Active Harvest Lots (from harvestLots collection)
+    var activeHarvests: [HarvestLotItem] = []
+    var isLoadingHarvests = false
+    private var harvestsListener: ListenerRegistration?
+
     init() {
         fetchUserProfile()
         fetchSellers()
         attachBidsListener()
+        attachHarvestsListener()
         requestNotificationPermission()
     }
 
     // MARK: - Firebase Fetch Logic
     func fetchUserProfile() {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        let userId = AuthManager.shared.currentUserID
+        guard !userId.isEmpty else { return }
 
         Task {
             do {
@@ -157,6 +163,38 @@ class DiscoveryDashboardViewModel {
     // MARK: - Highest Bid Helper
     func highestBid(for seller: SellerLocation) -> Double {
         highestBids[seller.id] ?? 0.0
+    }
+
+    func highestBid(for harvest: HarvestLotItem) -> Double {
+        highestBids[harvest.id] ?? harvest.currentBid
+    }
+
+    // MARK: - Harvests filtered by their own location within the search radius
+    var harvestsInRadius: [HarvestLotItem] {
+        let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
+        return activeHarvests.filter { harvest in
+            let harvestLocation = CLLocation(latitude: harvest.latitude, longitude: harvest.longitude)
+            return (harvestLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
+        }
+    }
+
+    // MARK: - Live Harvests Listener (all sellers' active harvest lots)
+    private func attachHarvestsListener() {
+        isLoadingHarvests = true
+        harvestsListener = Firestore.firestore()
+            .collection("harvestLots")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("Harvests listener error: \(error.localizedDescription)")
+                    self.isLoadingHarvests = false
+                    return
+                }
+                self.activeHarvests = snapshot?.documents.compactMap {
+                    HarvestLotItem(id: $0.documentID, data: $0.data())
+                }.sorted { $0.createdAt > $1.createdAt } ?? []
+                self.isLoadingHarvests = false
+            }
     }
 
     // MARK: - Notification Permission

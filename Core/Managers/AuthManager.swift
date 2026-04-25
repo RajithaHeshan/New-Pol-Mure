@@ -75,6 +75,13 @@ class AuthManager {
     }
     
 
+    // Reads userId from Core Data — available immediately on launch without waiting for Firebase Auth.
+    var currentUserID: String {
+        let request: NSFetchRequest<LocalSession> = LocalSession.fetchRequest()
+        let results = try? context.fetch(request)
+        return results?.first?.userId ?? Auth.auth().currentUser?.uid ?? ""
+    }
+
     func signOut() {
         do { try Auth.auth().signOut() } catch { print("Error signing out: \(error.localizedDescription)") }
         let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "LocalSession")

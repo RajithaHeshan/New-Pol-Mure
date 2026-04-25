@@ -475,7 +475,7 @@ struct InspectionDatePickerSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)
 
-                    // Date — graphical calendar
+             
                     DatePicker(
                         "Date",
                         selection: $localDate,
@@ -507,7 +507,7 @@ struct InspectionDatePickerSheet: View {
 
                     Divider().padding(.horizontal)
 
-                    // Reminder selector
+                   
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "bell.badge").foregroundColor(.blue)

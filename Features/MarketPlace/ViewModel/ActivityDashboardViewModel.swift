@@ -1,7 +1,6 @@
 // Location: New-Pol-Mure/Features/MarketPlace/ViewModels/ActivityDashboardViewModel.swift
 
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 import UserNotifications
 
@@ -50,7 +49,7 @@ class ActivityDashboardViewModel {
     private let allBidsListenerBox = ActivityListenerBox()
 
     init() {
-        self.currentBuyerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentBuyerID = AuthManager.shared.currentUserID
         attachBidsListener()
         attachAllBidsListener()
         attachOffersListener()

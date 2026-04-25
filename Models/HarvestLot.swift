@@ -21,11 +21,13 @@ import Foundation
 import CoreLocation
 
 struct HarvestLot: Identifiable {
-    let id: String          // Firestore seller document ID
+    let id: String
     let sellerInitial: String
+    let propertyName: String
     let locationName: String
     let coordinate: CLLocationCoordinate2D
     let quantity: Int
+    let qualityGrade: String
     let currentBid: Double
     let endDate: Date
 }

@@ -95,6 +95,7 @@ struct UrgentActionBanner: View {
 struct RecommendedBuyerCard: View {
     let buyer: RegisteredBuyer
     var lowestOffer: Double?
+    var showUrgentBadge: Bool = false
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -110,11 +111,6 @@ struct RecommendedBuyerCard: View {
                     Text(buyer.name)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    if buyer.isUrgent {
-                        Image(systemName: "flame.fill")
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
                 }
 
                 Text(buyer.locationName)
@@ -161,6 +157,7 @@ struct RecommendedBuyerCard: View {
 struct BuyerRowCard: View {
     let buyer: RegisteredBuyer
     var lowestOffer: Double?
+    var showUrgentBadge: Bool = false
 
     var body: some View {
         NavigationLink(destination: LiveOfferView(buyer: buyer)) {
@@ -175,11 +172,6 @@ struct BuyerRowCard: View {
                         Text(buyer.name)
                             .font(.subheadline.bold())
                             .foregroundColor(.primary)
-                        if buyer.isUrgent {
-                            Image(systemName: "flame.fill")
-                                .font(.caption2)
-                                .foregroundColor(.red)
-                        }
                     }
                     Text("Needs \(buyer.typicalVolume)")
                         .font(.caption)
@@ -211,6 +203,63 @@ struct BuyerRowCard: View {
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct UrgentPostCard: View {
+    let post: UrgentRequest
+    let buyer: RegisteredBuyer
+
+    var urgencyColor: Color {
+        let hoursLeft = post.deadline.timeIntervalSinceNow / 3600
+        return hoursLeft < 6 ? .red : .orange
+    }
+
+    var body: some View {
+        NavigationLink(destination: LiveOfferView(buyer: buyer, isUrgentPitch: true)) {
+            HStack(spacing: 12) {
+                Image(systemName: "flame.fill")
+                    .font(.title2)
+                    .foregroundColor(urgencyColor)
+                    .frame(width: 40)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(post.buyerName)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                    Text("\(post.quantity) Nuts · \(post.grade)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .font(.caption2)
+                        Text(post.location)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(post.deadline, style: .relative)
+                        .font(.caption.bold())
+                        .foregroundColor(urgencyColor)
+                    Text("Pitch Offer")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(urgencyColor)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(12)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(urgencyColor.opacity(0.4), lineWidth: 1))
         }
         .buttonStyle(PlainButtonStyle())
     }

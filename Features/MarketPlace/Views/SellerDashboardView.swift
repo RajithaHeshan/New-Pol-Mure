@@ -67,7 +67,7 @@ struct SellerDashboardView: View {
                                 HStack(spacing: 16) {
                                     ForEach(viewModel.recommendedBuyers) { buyer in
                                         NavigationLink(destination: LiveOfferView(buyer: buyer)) {
-                                            RecommendedBuyerCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id])
+                                            RecommendedBuyerCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id], showUrgentBadge: viewModel.selectedFilter == "Urgent Need")
                                         }
                                         .buttonStyle(PlainButtonStyle())
                                     }
@@ -79,7 +79,7 @@ struct SellerDashboardView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // MARK: Inline Preview Map
+                  
                     VStack(spacing: 16) {
                         HStack {
                             Text("Find Buyers Near My Estate")
@@ -142,40 +142,62 @@ struct SellerDashboardView: View {
 
                     Divider().padding(.vertical, 8)
 
-                    // MARK: Buyers List
+                 
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text("Buyers in Radius")
+                            Text(viewModel.selectedFilter == "Urgent Need" ? "Urgent Posts" : "Buyers in Radius")
                                 .font(.title3.bold())
                             Spacer()
-                            Text("\(viewModel.buyersInRadius.count) Found")
+                            Text("\(viewModel.selectedFilter == "Urgent Need" ? viewModel.urgentPosts.count : viewModel.buyersInRadius.count) Found")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         .padding(.horizontal)
 
-                        if viewModel.isLoadingBuyers {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 40)
-                        } else if viewModel.buyersInRadius.isEmpty {
-                            VStack(spacing: 8) {
-                                Image(systemName: "tray.fill")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.secondary)
-                                Text("No buyers inside this radius.")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.vertical, 40)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                        } else {
-                            LazyVStack(spacing: 16) {
-                                ForEach(viewModel.buyersInRadius) { buyer in
-                                    BuyerRowCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id])
+                        if viewModel.selectedFilter == "Urgent Need" {
+                            if viewModel.urgentPosts.isEmpty {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "tray.fill")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.secondary)
+                                    Text("No urgent buyer posts yet.")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
                                 }
+                                .padding(.vertical, 40)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                            } else {
+                                LazyVStack(spacing: 16) {
+                                    ForEach(viewModel.urgentPosts) { post in
+                                        UrgentPostCard(post: post, buyer: viewModel.buyer(for: post))
+                                    }
+                                }
+                                .padding(.horizontal)
                             }
-                            .padding(.horizontal)
+                        } else {
+                            if viewModel.isLoadingBuyers {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 40)
+                            } else if viewModel.buyersInRadius.isEmpty {
+                                VStack(spacing: 8) {
+                                    Image(systemName: "tray.fill")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.secondary)
+                                    Text("No buyers inside this radius.")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 40)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                            } else {
+                                LazyVStack(spacing: 16) {
+                                    ForEach(viewModel.buyersInRadius) { buyer in
+                                        BuyerRowCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id])
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                     }
                 }
@@ -183,6 +205,7 @@ struct SellerDashboardView: View {
             }
             .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Dashboard")
+            .onAppear { viewModel.onAppear() }
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search a town e.g. Kandy...")
             .overlay(alignment: .top) {
                 
@@ -206,14 +229,14 @@ struct SellerDashboardView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
 
-                        // 1. Notification Action
+                       
                         Button(action: { viewModel.showNotifications = true }) {
                             Image(systemName: viewModel.unreadNotificationCount > 0 ? "bell.badge.fill" : "bell.fill")
                                 .font(.title3)
                                 .foregroundColor(.green)
                         }
 
-                        // 2. Profile Action (Loads from Xcode Assets)
+                       
                         Button(action: { viewModel.showProfile = true }) {
                             Image(viewModel.profileImageName)
                                 .resizable()
@@ -224,7 +247,7 @@ struct SellerDashboardView: View {
                     }
                 }
             }
-            // MARK: - Profile / Developer Sheet
+
             .sheet(isPresented: $viewModel.showProfile) {
                 NavigationStack {
                     VStack(spacing: 24) {

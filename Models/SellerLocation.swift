@@ -17,7 +17,10 @@
 import Foundation
 import CoreLocation
 
-struct SellerLocation: Identifiable {
+struct SellerLocation: Identifiable, Hashable {
+    static func == (lhs: SellerLocation, rhs: SellerLocation) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
     let id: String
     let sellerName: String
     let locationName: String
@@ -31,9 +34,11 @@ struct SellerLocation: Identifiable {
         HarvestLot(
             id: id,
             sellerInitial: sellerName,
+            propertyName: "",
             locationName: locationName,
             coordinate: coordinate,
             quantity: Int(typicalYield) ?? 0,
+            qualityGrade: "",
             currentBid: currentBid,
             endDate: nextHarvestDate
         )

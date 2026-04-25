@@ -31,7 +31,7 @@ struct RecommendedSellerCard: View {
     let currentHighestBid: Double
 
     var body: some View {
-        NavigationLink(destination: LiveBiddingView(lot: seller.toHarvestLot(currentBid: currentHighestBid))) {
+        NavigationLink(value: seller) {
             VStack(alignment: .leading) {
                 Map(interactionModes: []) {
                     MapCircle(center: seller.coordinate, radius: 4000)
@@ -90,7 +90,7 @@ struct SellerRow: View {
     let currentHighestBid: Double
 
     var body: some View {
-        NavigationLink(destination: LiveBiddingView(lot: seller.toHarvestLot(currentBid: currentHighestBid))) {
+        NavigationLink(value: seller) {
             HStack {
                 Image(systemName: "person.circle.fill")
                     .resizable()
@@ -132,6 +132,130 @@ struct SellerRow: View {
             .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Harvest Row Card (same style as SellerRow)
+struct HarvestRowCard: View {
+    let harvest: HarvestLotItem
+    let currentHighestBid: Double
+
+    var body: some View {
+        HStack {
+            Image("Gemini_Generated_Image_bvc5lzbvc5lzbvc5")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(harvest.propertyName.isEmpty ? harvest.sellerName : harvest.propertyName)
+                    .font(.subheadline.bold())
+                Text("\(harvest.quantity) Coconuts")
+                    .font(.headline)
+                Text(harvest.locationName)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.leading, 4)
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Text("Highest Bid")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("Rs \(String(format: "%.0f", currentHighestBid))")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.blue)
+                Text("Bid Now")
+                    .font(.caption.bold())
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+}
+
+// MARK: - Harvest Lot Bid Card (horizontal scroll in Discovery)
+struct HarvestLotBidCard: View {
+    let harvest: HarvestLotItem
+    let currentHighestBid: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Image("Gemini_Generated_Image_bvc5lzbvc5lzbvc5")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 200, height: 110)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                if !harvest.propertyName.isEmpty {
+                    Text(harvest.propertyName)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                Text(harvest.sellerName)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(harvest.locationName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(harvest.quantity) Nuts")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.green)
+                        Text(harvest.qualityGrade)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Rs \(String(format: "%.0f", currentHighestBid))")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.blue)
+                        Text("Top Bid")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.top, 4)
+
+                Text("Bid Now")
+                    .font(.caption.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+                    .padding(.top, 4)
+            }
+            .padding(.top, 10)
+        }
+        .frame(width: 200)
+        .padding(12)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 }
 

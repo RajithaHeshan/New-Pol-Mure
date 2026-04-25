@@ -1,7 +1,6 @@
 // Location: New-Pol-Mure/Features/MarketPlace/ViewModels/SellerActivityDashboardViewModel.swift
 
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 import UserNotifications
 
@@ -34,6 +33,9 @@ class SellerActivityDashboardViewModel {
     // MARK: - Lowest offer per buyerID — drives winning/underbid status in tab 0
     var lowestOfferPerBuyer: [String: Double] = [:]
 
+    // MARK: - Urgent buyer IDs — cross-referenced from urgentRequests collection
+    var urgentBuyerIDs: Set<String> = []
+
     // MARK: - Loading States
     var isLoadingOffers       = false
     var isLoadingBids         = false
@@ -42,19 +44,21 @@ class SellerActivityDashboardViewModel {
 
     private let currentSellerID: String
 
-    private let offersListenerBox       = SellerActivityListenerBox()
-    private let allOffersListenerBox    = SellerActivityListenerBox()
-    private let bidsListenerBox         = SellerActivityListenerBox()
-    private let transactionsListenerBox = SellerActivityListenerBox()
-    private let contractsListenerBox    = SellerActivityListenerBox()
+    private let offersListenerBox         = SellerActivityListenerBox()
+    private let allOffersListenerBox      = SellerActivityListenerBox()
+    private let bidsListenerBox           = SellerActivityListenerBox()
+    private let transactionsListenerBox   = SellerActivityListenerBox()
+    private let contractsListenerBox      = SellerActivityListenerBox()
+    private let urgentRequestsListenerBox = SellerActivityListenerBox()
 
     init() {
-        self.currentSellerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentSellerID = AuthManager.shared.currentUserID
         attachOffersListener()
         attachAllOffersListener()
         attachBidsListener()
         attachTransactionsListener()
         attachContractsListener()
+        attachUrgentRequestsListener()
     }
 
     // MARK: - Tab 0: My Offers Listener
@@ -110,6 +114,27 @@ class SellerActivityDashboardViewModel {
     func isLowest(offer: Offer) -> Bool {
         guard let lowest = lowestOfferPerBuyer[offer.buyerID] else { return false }
         return offer.amount <= lowest
+    }
+
+    // MARK: - Urgent Status Helper (buyer has an active urgent request)
+    func isUrgent(offer: Offer) -> Bool {
+        urgentBuyerIDs.contains(offer.buyerID)
+    }
+
+    // MARK: - Urgent Requests Listener (tracks which buyers have active urgent posts)
+    private func attachUrgentRequestsListener() {
+        urgentRequestsListenerBox.listener = Firestore.firestore()
+            .collection("urgentRequests")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("UrgentRequests listener error (activity): \(error.localizedDescription)")
+                    return
+                }
+                self.urgentBuyerIDs = Set(
+                    snapshot?.documents.compactMap { $0.data()["buyerID"] as? String } ?? []
+                )
+            }
     }
 
     // MARK: - Tab 1: Inbound Bids on This Seller's Harvest Lots

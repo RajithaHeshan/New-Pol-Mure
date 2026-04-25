@@ -6,7 +6,7 @@ import FirebaseFirestore
 struct Bid: Identifiable {
     let id: String              // Firestore document ID
     let sellerID: String        // Seller's user document ID (links to HarvestLot.id)
-    let bidderID: String        // Buyer's user document ID
+    let bidderID: String        
     let bidderName: String
     let amount: Double
     let placedAt: Date

@@ -7,8 +7,8 @@ struct LiveOfferView: View {
     @State private var viewModel: LiveOfferViewModel
     @FocusState private var isInputFocused: Bool
     
-    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0) {
-        self._viewModel = State(initialValue: LiveOfferViewModel(buyer: buyer, currentMarketPrice: currentMarketPrice))
+    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0, isUrgentPitch: Bool = false) {
+        self._viewModel = State(initialValue: LiveOfferViewModel(buyer: buyer, currentMarketPrice: currentMarketPrice, isUrgentPitch: isUrgentPitch))
     }
     
     var body: some View {

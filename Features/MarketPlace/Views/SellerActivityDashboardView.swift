@@ -9,11 +9,11 @@ struct SellerActivityDashboardView: View {
         NavigationStack {
             VStack(spacing: 0) {
 
-                // Updated Picker: Added Transactions Tab
+                
                 Picker("Activity Type", selection: $viewModel.selectedTab) {
                     Text("Active Pitches").tag(0)
                     Text("Direct Bids").tag(1)
-                    Text("Transactions").tag(2) // NEW TAB
+                    Text("Transactions").tag(2)
                     Text("Contracts").tag(3)
                 }
                 .pickerStyle(.segmented)
@@ -24,7 +24,7 @@ struct SellerActivityDashboardView: View {
                     VStack(spacing: 16) {
 
                         if viewModel.selectedTab == 0 {
-                            // ACTIVE PITCHES
+                          
                             if viewModel.isLoadingOffers {
                                 ProgressView()
                                     .frame(maxWidth: .infinity)
@@ -37,7 +37,8 @@ struct SellerActivityDashboardView: View {
                                         buyerName: offer.buyerID,
                                         location: "",
                                         currentOffer: offer.amount,
-                                        isLowest: viewModel.isLowest(offer: offer)
+                                        isLowest: viewModel.isLowest(offer: offer),
+                                        isUrgent: viewModel.isUrgent(offer: offer)
                                     )
                                 }
                             }
@@ -153,13 +154,21 @@ struct SellerPendingPitchRow: View {
     let buyerName: String
     let location: String
     let currentOffer: Double
-    let isLowest: Bool // For sellers, being the lowest price is winning
+    let isLowest: Bool
+    var isUrgent: Bool = false
 
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
-                Text(buyerName)
-                    .font(.headline)
+                HStack(spacing: 6) {
+                    if isUrgent {
+                        Image(systemName: "flame.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.red)
+                    }
+                    Text(buyerName)
+                        .font(.headline)
+                }
                 if !location.isEmpty {
                     HStack {
                         Image(systemName: "mappin.and.ellipse")
@@ -191,6 +200,9 @@ struct SellerPendingPitchRow: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .overlay(
+            isUrgent ? RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.4), lineWidth: 1) : nil
+        )
         .padding(.horizontal)
     }
 }

@@ -58,52 +58,46 @@ struct LiveBiddingView: View {
 struct BiddingMapHeader: View {
     let coordinate: CLLocationCoordinate2D
 
-    @State private var cameraPosition: MapCameraPosition
-
-    init(coordinate: CLLocationCoordinate2D) {
-        self.coordinate = coordinate
-        let customCamera = MapCamera(
-            centerCoordinate: coordinate,
-            distance: 6000,
-            heading: 45,
-            pitch: 60
-        )
-        self._cameraPosition = State(initialValue: .camera(customCamera))
+    // True when Firestore had no lat/lng — we skip the map entirely
+    private var isValidCoordinate: Bool {
+        coordinate.latitude != 0 || coordinate.longitude != 0
     }
 
     var body: some View {
-        Map(position: $cameraPosition, interactionModes: []) {
-            MapPolygon(coordinates: createCylinderBase(center: coordinate, radiusMeters: 2500))
-                .foregroundStyle(.blue.opacity(0.3))
-            Marker("Estate Location", coordinate: coordinate)
-                .tint(.blue)
-        }
-        .frame(height: 220)
-        .mask(
-            LinearGradient(
-                gradient: Gradient(colors: [.black, .black, .black, .clear]),
-                startPoint: .top,
-                endPoint: .bottom
+        if isValidCoordinate {
+            Map(position: .constant(.region(MKCoordinateRegion(
+                center: coordinate,
+                latitudinalMeters: 8000,
+                longitudinalMeters: 8000
+            ))), interactionModes: []) {
+                MapCircle(center: coordinate, radius: 2500)
+                    .foregroundStyle(.blue.opacity(0.3))
+                Marker("Estate Location", coordinate: coordinate)
+                    .tint(.blue)
+            }
+            .frame(height: 220)
+            .mask(
+                LinearGradient(
+                    gradient: Gradient(colors: [.black, .black, .black, .clear]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
             )
-        )
-    }
-
-    private func createCylinderBase(center: CLLocationCoordinate2D, radiusMeters: Double) -> [CLLocationCoordinate2D] {
-        let earthRadius = 6378100.0
-        let lat = center.latitude * .pi / 180.0
-        let lon = center.longitude * .pi / 180.0
-
-        var points: [CLLocationCoordinate2D] = []
-        for i in 0..<36 {
-            let angle = Double(i) * 10.0 * .pi / 180.0
-            let dLat = (radiusMeters * cos(angle)) / earthRadius
-            let dLon = (radiusMeters * sin(angle)) / (earthRadius * cos(lat))
-            points.append(CLLocationCoordinate2D(
-                latitude: (lat + dLat) * 180.0 / .pi,
-                longitude: (lon + dLon) * 180.0 / .pi
-            ))
+        } else {
+            Image("Gemini_Generated_Image_bvc5lzbvc5lzbvc5")
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 220)
+                .clipped()
+                .mask(
+                    LinearGradient(
+                        gradient: Gradient(colors: [.black, .black, .black, .clear]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
         }
-        return points
     }
 }
 
@@ -113,15 +107,23 @@ struct HarvestDetailSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "person.circle.fill")
+            HStack(spacing: 14) {
+                Image("Gemini_Generated_Image_bvc5lzbvc5lzbvc5")
                     .resizable()
-                    .frame(width: 50, height: 50)
-                    .foregroundColor(.gray.opacity(0.5))
+                    .scaledToFill()
+                    .frame(width: 56, height: 56)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                VStack(alignment: .leading) {
-                    Text(lot.sellerInitial)
-                        .font(.title3.bold())
+                VStack(alignment: .leading, spacing: 4) {
+                    if !lot.propertyName.isEmpty {
+                        Text(lot.propertyName)
+                            .font(.title3.bold())
+                    }
+                    if !lot.sellerInitial.isEmpty {
+                        Text(lot.sellerInitial)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                     HStack {
                         Image(systemName: "mappin.and.ellipse")
                             .foregroundColor(.secondary)
@@ -134,12 +136,20 @@ struct HarvestDetailSection: View {
 
             Text("\(lot.quantity) Coconuts")
                 .font(.system(size: 34, weight: .heavy, design: .rounded))
-                .padding(.top, 8)
+                .padding(.top, 4)
+
+            if !lot.qualityGrade.isEmpty {
+                Text(lot.qualityGrade)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
 
             HStack {
                 Image(systemName: "calendar.badge.clock")
                     .foregroundColor(.blue)
-                Text("Auction closes in 24 Hours")
+                Text("Ends ")
+                    .font(.subheadline.bold())
+                + Text(lot.endDate, style: .relative)
                     .font(.subheadline.bold())
             }
             .padding(10)
@@ -278,9 +288,11 @@ struct PresentationDebugTools: View {
         LiveBiddingView(lot: HarvestLot(
             id: "preview-seller-id",
             sellerInitial: "M. Silva",
+            propertyName: "Silva Estate",
             locationName: "Madampe",
             coordinate: CLLocationCoordinate2D(latitude: 7.4984, longitude: 79.8441),
             quantity: 10000,
+            qualityGrade: "Premium (Export Quality)",
             currentBid: 95.0,
             endDate: Date().addingTimeInterval(86400)
         ))

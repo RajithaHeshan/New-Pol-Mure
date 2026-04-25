@@ -53,7 +53,9 @@ struct UrgentBoardView: View {
                         .padding(.vertical, 60)
                     } else {
                         ForEach(viewModel.myRequests) { request in
-                            UrgentRequestCard(request: request)
+                            UrgentRequestCard(request: request) {
+                                viewModel.deleteRequest(request)
+                            }
                         }
                     }
                 }
@@ -81,6 +83,7 @@ struct UrgentBoardView: View {
 
 struct UrgentRequestCard: View {
     let request: UrgentRequest
+    let onDelete: () -> Void
 
     var urgencyColor: Color {
         let hoursLeft = request.deadline.timeIntervalSinceNow / 3600
@@ -89,7 +92,6 @@ struct UrgentRequestCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header: Status & Location
             HStack {
                 Text("YOUR POST")
                     .font(.caption2.bold())
@@ -101,21 +103,20 @@ struct UrgentRequestCard: View {
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin.and.ellipse")
-                        .font(.caption)
-                    Text(request.location)
-                        .font(.caption)
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption.bold())
+                        .foregroundColor(.red)
+                        .padding(8)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Circle())
                 }
-                .foregroundColor(.secondary)
             }
 
-            // Core Data: Quantity & Grade
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(request.quantity) Nuts")
                         .font(.title2.bold())
-
                     Text(request.grade)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -126,7 +127,6 @@ struct UrgentRequestCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Image(systemName: "flame.fill")
                         .foregroundColor(urgencyColor)
-
                     Text(request.deadline, style: .relative)
                         .font(.caption.bold())
                         .foregroundColor(urgencyColor)
@@ -198,8 +198,7 @@ struct UrgentRequestModalView: View {
 
                 Section {
                     Button(action: {
-                        viewModel.postUrgentRequest(quantity: quantity, grade: selectedGrade, deadline: requiredDate)
-                        dismiss()
+                        viewModel.postUrgentRequest(quantity: quantity, grade: selectedGrade, deadline: requiredDate, onSuccess: { dismiss() })
                     }) {
                         if viewModel.isPosting {
                             ProgressView()

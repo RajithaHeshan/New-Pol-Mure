@@ -31,12 +31,15 @@ class DisputeModalViewModel {
         counterOffer: String,
         onSuccess: @escaping @MainActor () -> Void
     ) {
+        print("🟡 submitCounterOffer called — contractID: '\(contractID)', counterOffer: '\(counterOffer)'")
         let trimmed = counterOffer.trimmingCharacters(in: .whitespaces)
         guard let newAmount = Double(trimmed), newAmount > 0 else {
+            print("❌ Validation failed — trimmed: '\(trimmed)', parsed: \(Double(trimmed) as Any?)")
             submitError = "Please enter a valid counter-offer amount greater than 0."
             return
         }
         guard !contractID.isEmpty else {
+            print("❌ contractID is empty")
             submitError = "Contract ID is missing. Please try again."
             return
         }

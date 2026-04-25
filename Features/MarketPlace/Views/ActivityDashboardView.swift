@@ -61,6 +61,7 @@ struct ActivityDashboardView: View {
                                 ForEach(viewModel.incomingOffers) { offer in
                                     DirectOfferRow(
                                         offer: offer,
+                                        isUrgent: offer.isUrgentPitch,
                                         onAccept:  { viewModel.acceptOffer(offer) },
                                         onDecline: { viewModel.declineOffer(offer) }
                                     )
@@ -185,6 +186,7 @@ struct PendingBidRow: View {
 
 struct DirectOfferRow: View {
     let offer:     Offer
+    var isUrgent:  Bool = false
     let onAccept:  () -> Void
     let onDecline: () -> Void
 
@@ -197,8 +199,15 @@ struct DirectOfferRow: View {
                     .foregroundColor(.gray.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(offer.sellerName)
-                        .font(.headline)
+                    HStack(spacing: 6) {
+                        if isUrgent {
+                            Image(systemName: "flame.fill")
+                                .font(.subheadline)
+                                .foregroundColor(.red)
+                        }
+                        Text(offer.sellerName)
+                            .font(.headline)
+                    }
                     Text(offer.placedAt, style: .relative)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -260,6 +269,9 @@ struct DirectOfferRow: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .overlay(
+            isUrgent ? RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.4), lineWidth: 1) : nil
+        )
         .padding(.horizontal)
     }
 }

@@ -1,7 +1,6 @@
 // Location: New-Pol-Mure/Features/MarketPlace/ViewModels/UrgentBoardViewModel.swift
 
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 
 private final class UrgentBoardListenerBox {
@@ -33,7 +32,7 @@ class UrgentBoardViewModel {
     private let requestsListenerBox = UrgentBoardListenerBox()
 
     init() {
-        self.currentBuyerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentBuyerID = AuthManager.shared.currentUserID
         fetchBuyerProfile()
         attachRequestsListener()
     }
@@ -43,12 +42,12 @@ class UrgentBoardViewModel {
         guard !currentBuyerID.isEmpty else { return }
 
         Firestore.firestore()
-            .collection("buyers")
+            .collection("users")
             .document(currentBuyerID)
             .getDocument { [weak self] snapshot, error in
                 guard let self, let data = snapshot?.data() else { return }
-                self.currentBuyerName     = data["name"]     as? String ?? ""
-                self.currentBuyerLocation = data["location"] as? String ?? ""
+                self.currentBuyerName     = data["fullName"]     as? String ?? ""
+                self.currentBuyerLocation = data["locationName"] as? String ?? ""
             }
     }
 
@@ -77,7 +76,7 @@ class UrgentBoardViewModel {
     }
 
     // MARK: - Post New Urgent Request
-    func postUrgentRequest(quantity: Int, grade: String, deadline: Date) {
+    func postUrgentRequest(quantity: Int, grade: String, deadline: Date, onSuccess: @escaping @MainActor () -> Void = {}) {
         guard !currentBuyerID.isEmpty else { return }
         isPosting = true
 
@@ -90,14 +89,39 @@ class UrgentBoardViewModel {
             "deadline":  Timestamp(date: deadline)
         ]
 
-        Firestore.firestore()
-            .collection("urgentRequests")
-            .addDocument(data: data) { [weak self] error in
-                guard let self else { return }
-                if let error {
-                    print("Post urgent request error: \(error.localizedDescription)")
-                }
+        let db = Firestore.firestore()
+        db.collection("urgentRequests").addDocument(data: data) { [weak self] error in
+            guard let self else { return }
+            if let error {
+                print("Post urgent request error: \(error.localizedDescription)")
                 self.isPosting = false
+                return
             }
+            // Mark this buyer as urgent so sellers see them under "Urgent Need"
+            db.collection("users").document(self.currentBuyerID)
+                .updateData(["isUrgent": true]) { error in
+                    if let error { print("isUrgent update error: \(error.localizedDescription)") }
+                }
+            self.isPosting = false
+            Task { await onSuccess() }
+        }
+    }
+
+    // MARK: - Delete Urgent Request
+    func deleteRequest(_ request: UrgentRequest) {
+        let db = Firestore.firestore()
+        db.collection("urgentRequests").document(request.id).delete { [weak self] error in
+            guard let self else { return }
+            if let error { print("Delete urgent request error: \(error.localizedDescription)"); return }
+
+            // If the buyer has no more active requests, clear the urgent flag
+            let remaining = self.myRequests.filter { $0.id != request.id }
+            if remaining.isEmpty {
+                db.collection("users").document(self.currentBuyerID)
+                    .updateData(["isUrgent": false]) { error in
+                        if let error { print("isUrgent clear error: \(error.localizedDescription)") }
+                    }
+            }
+        }
     }
 }
