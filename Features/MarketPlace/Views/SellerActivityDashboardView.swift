@@ -34,11 +34,11 @@ struct SellerActivityDashboardView: View {
                             } else {
                                 ForEach(viewModel.myOffers) { offer in
                                     SellerPendingPitchRow(
-                                        buyerName: offer.buyerID,
+                                        buyerName: offer.buyerName.isEmpty ? offer.buyerID : offer.buyerName,
                                         location: "",
                                         currentOffer: offer.amount,
                                         isLowest: viewModel.isLowest(offer: offer),
-                                        isUrgent: viewModel.isUrgent(offer: offer)
+                                        isUrgent: offer.isUrgentPitch
                                     )
                                 }
                             }

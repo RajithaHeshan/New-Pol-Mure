@@ -114,6 +114,7 @@ class LiveOfferViewModel {
             do {
                 let offerData: [String: Any] = [
                     "buyerID":       buyer.id,
+                    "buyerName":     buyer.name,
                     "sellerID":      currentSellerID,
                     "sellerName":    currentSellerName,
                     "amount":        newOffer,

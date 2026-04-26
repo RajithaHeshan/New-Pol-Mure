@@ -6,6 +6,7 @@ import FirebaseFirestore
 struct Offer: Identifiable {
     let id: String
     let buyerID: String
+    let buyerName: String
     let sellerID: String
     let sellerName: String
     let amount: Double
@@ -24,6 +25,7 @@ struct Offer: Identifiable {
 
         self.id             = id
         self.buyerID        = buyerID
+        self.buyerName      = data["buyerName"] as? String ?? ""
         self.sellerID       = sellerID
         self.sellerName     = sellerName
         self.amount         = amount
