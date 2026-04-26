@@ -255,7 +255,8 @@ class SellerDashboardViewModel {
                             locationName: location,
                             coordinate: coordinate,
                             typicalVolume: volume,
-                            rating: data["rating"] as? Double ?? 0.0,
+                            rating: data["averageRating"] as? Double ?? 0.0,
+                            ratingCount: data["ratingCount"] as? Int ?? 0,
                             isUrgent: data["isUrgent"] as? Bool ?? false
                         ))
                     }
@@ -348,6 +349,7 @@ class SellerDashboardViewModel {
             coordinate: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
             typicalVolume: "\(post.quantity)",
             rating: 0.0,
+            ratingCount: 0,
             isUrgent: true
         )
     }

@@ -42,6 +42,10 @@ class SellerContractViewModel {
     var isConfirmingHandover = false
     var isCancellingContract = false
 
+    // MARK: - Rating
+    var showRatingSheet  = false
+    var sellerDisplayName: String = ""
+
     private let contractListenerBox  = SellerContractListenerBox()
     private let disputeListenerBox   = SellerContractListenerBox()
 
@@ -75,6 +79,11 @@ class SellerContractViewModel {
         attachDisputeListener()
         fetchSellerCoordinate(sellerID: contract.sellerID)
         fetchBuyerVolume(buyerID: contract.buyerID)
+        fetchSellerDisplayName(sellerID: contract.sellerID)
+
+        if contract.status == "completed" {
+            checkIfAlreadyRated(sellerID: contract.sellerID)
+        }
     }
 
     // MARK: - Fetch Seller's Own Estate Profile for Calendar event location
@@ -235,10 +244,37 @@ class SellerContractViewModel {
                     .updateData(["status": "completed"])
 
                 withAnimation(.spring()) { currentState = .completed }
+                // Prompt seller to rate the buyer
+                showRatingSheet = true
             } catch {
                 print("Confirm handover error: \(error.localizedDescription)")
             }
             isConfirmingHandover = false
+        }
+    }
+
+    // MARK: - Fetch seller's display name for the rating sheet reviewer label
+    private func fetchSellerDisplayName(sellerID: String) {
+        Task {
+            let doc = try? await Firestore.firestore()
+                .collection("users").document(sellerID).getDocument()
+            if let name = doc?.data()?["fullName"] as? String {
+                sellerDisplayName = name
+            }
+        }
+    }
+
+    // MARK: - Check if seller already rated this contract
+    private func checkIfAlreadyRated(sellerID: String) {
+        Task {
+            let snapshot = try? await Firestore.firestore()
+                .collection("ratings")
+                .whereField("contractID", isEqualTo: contractID)
+                .whereField("reviewerID", isEqualTo: sellerID)
+                .getDocuments()
+            if snapshot?.documents.isEmpty == false {
+                showRatingSheet = false
+            }
         }
     }
 }

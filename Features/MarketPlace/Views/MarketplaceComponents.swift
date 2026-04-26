@@ -2,6 +2,37 @@
 import SwiftUI
 import MapKit
 
+// MARK: - Shared Star Rating Badge
+struct StarRatingBadge: View {
+    let rating: Double
+    let count: Int
+
+    var body: some View {
+        if count == 0 {
+            HStack(spacing: 3) {
+                Image(systemName: "star")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text("No ratings yet")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        } else {
+            HStack(spacing: 3) {
+                Image(systemName: "star.fill")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                Text(String(format: "%.1f", rating))
+                    .font(.caption.bold())
+                    .foregroundColor(.primary)
+                Text("(\(count))")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+}
+
 struct FilterChipsView: View {
     let filters: [String]
     @Binding var selectedFilter: String
@@ -56,12 +87,14 @@ struct RecommendedSellerCard: View {
                         .font(.subheadline)
                         .foregroundColor(.secondary)
 
+                    StarRatingBadge(rating: seller.averageRating, count: seller.ratingCount)
+                        .padding(.top, 2)
+
                     HStack {
                         Text("Yield: \(seller.typicalYield) Nuts")
                             .font(.subheadline.bold())
                             .foregroundColor(.green)
                         Spacer()
-                        // MARK: - Current Highest Bid Badge
                         Text("Rs \(String(format: "%.0f", currentHighestBid))")
                             .font(.caption.bold())
                             .foregroundColor(.blue)
@@ -105,12 +138,12 @@ struct SellerRow: View {
                     Text(seller.locationName)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                    StarRatingBadge(rating: seller.averageRating, count: seller.ratingCount)
                 }
                 .padding(.leading, 4)
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 6) {
-                    // MARK: - Current Highest Bid
                     Text("Highest Bid")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -139,6 +172,8 @@ struct SellerRow: View {
 struct HarvestRowCard: View {
     let harvest: HarvestLotItem
     let currentHighestBid: Double
+    var sellerRating: Double = 0.0
+    var sellerRatingCount: Int = 0
 
     var body: some View {
         HStack {
@@ -156,6 +191,7 @@ struct HarvestRowCard: View {
                 Text(harvest.locationName)
                     .font(.caption)
                     .foregroundColor(.secondary)
+                StarRatingBadge(rating: sellerRating, count: sellerRatingCount)
             }
             .padding(.leading, 4)
             Spacer()

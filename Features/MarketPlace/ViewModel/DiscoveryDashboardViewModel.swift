@@ -44,11 +44,16 @@ class DiscoveryDashboardViewModel {
     var isLoadingHarvests = false
     private var harvestsListener: ListenerRegistration?
 
+    // MARK: - Seller Ratings Map (sellerID → (averageRating, ratingCount))
+    var sellerRatings: [String: (Double, Int)] = [:]
+    private var sellerRatingsListener: ListenerRegistration?
+
     init() {
         fetchUserProfile()
         fetchSellers()
         attachBidsListener()
         attachHarvestsListener()
+        attachSellerRatingsListener()
         requestNotificationPermission()
     }
 
@@ -122,7 +127,9 @@ class DiscoveryDashboardViewModel {
                         coordinate: coordinate,
                         typicalYield: yield,
                         certificationLevel: cert,
-                        nextHarvestDate: harvestDate
+                        nextHarvestDate: harvestDate,
+                        averageRating: data["averageRating"] as? Double ?? 0.0,
+                        ratingCount: data["ratingCount"] as? Int ?? 0
                     ))
                 }
 
@@ -182,6 +189,24 @@ class DiscoveryDashboardViewModel {
             let harvestLocation = CLLocation(latitude: harvest.latitude, longitude: harvest.longitude)
             return (harvestLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
         }
+    }
+
+    // MARK: - Seller Ratings Listener — keeps sellerID → (avg, count) map live
+    private func attachSellerRatingsListener() {
+        sellerRatingsListener = Firestore.firestore()
+            .collection("users")
+            .whereField("role", isEqualTo: "SELLER")
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+                var map: [String: (Double, Int)] = [:]
+                for doc in docs {
+                    let data = doc.data()
+                    let avg   = data["averageRating"] as? Double ?? 0.0
+                    let count = data["ratingCount"]   as? Int    ?? 0
+                    map[doc.documentID] = (avg, count)
+                }
+                self.sellerRatings = map
+            }
     }
 
     // MARK: - Live Harvests Listener (all sellers' active harvest lots)

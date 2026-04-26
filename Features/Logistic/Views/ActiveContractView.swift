@@ -64,6 +64,18 @@ struct ActiveContractView: View {
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $viewModel.showRatingSheet) {
+                RatingSheet(
+                    contractID:   viewModel.contractID,
+                    reviewerID:   viewModel.buyerID,
+                    reviewerName: viewModel.buyerDisplayName,
+                    revieweeID:   viewModel.sellerID,
+                    revieweeName: viewModel.sellerName,
+                    role:         "buyer"
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
     
@@ -446,22 +458,34 @@ struct ContextualActionArea: View {
 
             // STEP 5 — Done
             } else if viewModel.currentState == .completed {
-                VStack(spacing: 8) {
-                    Image(systemName: "checkmark.shield.fill")
-                        .font(.largeTitle)
-                        .foregroundColor(.green)
-                    Text("Transaction Complete")
-                        .font(.headline)
-                        .foregroundColor(.green)
-                    Text("Escrow funds have been successfully transferred to the seller's account.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
+                VStack(spacing: 12) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "checkmark.shield.fill")
+                            .font(.largeTitle)
+                            .foregroundColor(.green)
+                        Text("Transaction Complete")
+                            .font(.headline)
+                            .foregroundColor(.green)
+                        Text("Escrow funds have been successfully transferred to the seller's account.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(12)
+
+                    Button(action: { viewModel.showRatingSheet = true }) {
+                        Label("Rate \(viewModel.sellerName)", systemImage: "star.fill")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.blue.opacity(0.1))
+                            .foregroundColor(.blue)
+                            .cornerRadius(12)
+                    }
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.green.opacity(0.1))
-                .cornerRadius(12)
                 .transition(.scale.combined(with: .opacity))
             }
         }

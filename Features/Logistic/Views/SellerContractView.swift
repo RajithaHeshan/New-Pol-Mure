@@ -59,6 +59,18 @@ struct SellerContractView: View {
             }
             .navigationTitle("Contract \(viewModel.contractRef)")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $viewModel.showRatingSheet) {
+                RatingSheet(
+                    contractID:   viewModel.contractID,
+                    reviewerID:   viewModel.sellerID,
+                    reviewerName: viewModel.sellerDisplayName,
+                    revieweeID:   viewModel.buyerID,
+                    revieweeName: viewModel.buyerName,
+                    role:         "seller"
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
     
@@ -138,6 +150,19 @@ struct SellerContractView: View {
                 .foregroundColor(.white)
                 .cornerRadius(12)
                 .disabled(viewModel.isConfirmingHandover)
+                .padding(.horizontal)
+                .padding(.bottom, 20)
+                .background(LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground).opacity(0.0), Color(UIColor.systemGroupedBackground)]), startPoint: .top, endPoint: .bottom).padding(.top, -20))
+            } else if viewModel.currentState == .completed {
+                Button(action: { viewModel.showRatingSheet = true }) {
+                    Label("Rate \(viewModel.buyerName)", systemImage: "star.fill")
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.orange.opacity(0.1))
+                        .foregroundColor(.orange)
+                        .cornerRadius(12)
+                }
                 .padding(.horizontal)
                 .padding(.bottom, 20)
                 .background(LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground).opacity(0.0), Color(UIColor.systemGroupedBackground)]), startPoint: .top, endPoint: .bottom).padding(.top, -20))

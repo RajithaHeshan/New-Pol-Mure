@@ -258,6 +258,7 @@ struct PresentationDebugToolsOffer: View {
             coordinate: CLLocationCoordinate2D(latitude: 6.9333, longitude: 79.9833),
             typicalVolume: "5K - 10K Nuts",
             rating: 4.7,
+            ratingCount: 12,
             isUrgent: true
         ))
     }

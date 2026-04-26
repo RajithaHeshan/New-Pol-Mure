@@ -52,6 +52,10 @@ class ActiveContractViewModel {
     // MARK: - Action States
     var isReleasingFunds = false
 
+    // MARK: - Rating
+    var showRatingSheet = false
+    var buyerDisplayName: String = ""
+
     private let contractListenerBox = ContractListenerBox()
 
     init(contract: Contract) {
@@ -82,7 +86,13 @@ class ActiveContractViewModel {
 
         fetchSellerProfile(sellerID: contract.sellerID, useProfileCoordinate: contract.harvestLatitude == nil)
         fetchBuyerCoordinate(buyerID: contract.buyerID)
+        fetchBuyerDisplayName(buyerID: contract.buyerID)
         attachContractListener()
+
+        // If already completed when opened, check if buyer has already rated
+        if contract.status == "completed" {
+            checkIfAlreadyRated()
+        }
     }
 
     // MARK: - Real-Time Contract Listener
@@ -259,6 +269,34 @@ class ActiveContractViewModel {
                 .updateData(["status": "qualityApproved"])
 
             isReleasingFunds = false
+            // Prompt buyer to rate the seller
+            showRatingSheet = true
+        }
+    }
+
+    // MARK: - Fetch buyer's display name for the rating sheet reviewer label
+    private func fetchBuyerDisplayName(buyerID: String) {
+        Task {
+            let doc = try? await Firestore.firestore()
+                .collection("users").document(buyerID).getDocument()
+            if let name = doc?.data()?["fullName"] as? String {
+                buyerDisplayName = name
+            }
+        }
+    }
+
+    // MARK: - Check if buyer already rated this contract (prevents duplicate sheet on re-open)
+    private func checkIfAlreadyRated() {
+        Task {
+            let snapshot = try? await Firestore.firestore()
+                .collection("ratings")
+                .whereField("contractID", isEqualTo: contractID)
+                .whereField("reviewerID", isEqualTo: buyerID)
+                .getDocuments()
+            // If a rating already exists, don't show the sheet again
+            if snapshot?.documents.isEmpty == false {
+                showRatingSheet = false
+            }
         }
     }
 }

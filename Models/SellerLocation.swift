@@ -28,6 +28,8 @@ struct SellerLocation: Identifiable, Hashable {
     let typicalYield: String
     let certificationLevel: String
     let nextHarvestDate: Date
+    let averageRating: Double
+    let ratingCount: Int
 
     // Converts SellerLocation into a HarvestLot for the LiveBiddingView
     func toHarvestLot(currentBid: Double) -> HarvestLot {

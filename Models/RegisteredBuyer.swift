@@ -9,5 +9,6 @@ struct RegisteredBuyer: Identifiable {
     let coordinate: CLLocationCoordinate2D
     let typicalVolume: String
     let rating: Double
+    let ratingCount: Int
     let isUrgent: Bool
 }

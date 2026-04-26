@@ -122,13 +122,7 @@ struct RecommendedBuyerCard: View {
                         .font(.subheadline.bold())
                         .foregroundColor(.orange)
                     Spacer()
-                    HStack(spacing: 2) {
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.yellow)
-                            .font(.caption2)
-                        Text(String(format: "%.1f", buyer.rating))
-                            .font(.caption.bold())
-                    }
+                    StarRatingBadge(rating: buyer.rating, count: buyer.ratingCount)
                 }
                 .padding(.top, 4)
 
@@ -168,16 +162,13 @@ struct BuyerRowCard: View {
                     .foregroundColor(.gray.opacity(0.5))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(buyer.name)
-                            .font(.subheadline.bold())
-                            .foregroundColor(.primary)
-                    }
+                    Text(buyer.name)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
                     Text("Needs \(buyer.typicalVolume)")
                         .font(.caption)
                         .foregroundColor(.secondary)
-
-                    // MARK: - Live Lowest Offer Badge
+                    StarRatingBadge(rating: buyer.rating, count: buyer.ratingCount)
                     if let price = lowestOffer {
                         HStack(spacing: 3) {
                             Image(systemName: "tag.fill")

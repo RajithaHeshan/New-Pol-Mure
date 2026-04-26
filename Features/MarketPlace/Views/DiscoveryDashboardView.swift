@@ -181,7 +181,12 @@ struct DiscoveryDashboardView: View {
                     }
                     ForEach(viewModel.harvestsInRadius) { harvest in
                         NavigationLink(value: harvest.id) {
-                            HarvestRowCard(harvest: harvest, currentHighestBid: viewModel.highestBid(for: harvest))
+                            HarvestRowCard(
+                                harvest: harvest,
+                                currentHighestBid: viewModel.highestBid(for: harvest),
+                                sellerRating: viewModel.sellerRatings[harvest.sellerID]?.0 ?? 0.0,
+                                sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0
+                            )
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
