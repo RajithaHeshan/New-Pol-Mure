@@ -57,6 +57,7 @@ class SellerContractViewModel {
         // Map Firestore status string → SellerContractState FSM
         switch contract.status {
         case "escrow":          self.currentState = .escrowSecured
+        case "fundsLocked":     self.currentState = .escrowSecured
         case "inspection":      self.currentState = .buyerEnRoute
         case "dispute":         self.currentState = .buyerEnRoute
         case "qualityApproved": self.currentState = .buyerEnRoute
@@ -125,6 +126,7 @@ class SellerContractViewModel {
                 withAnimation {
                     switch status {
                     case "escrow":          self.currentState = .escrowSecured
+                    case "fundsLocked":     self.currentState = .escrowSecured
                     case "inspection":      self.currentState = .buyerEnRoute
                     case "dispute":         self.currentState = .buyerEnRoute
                     case "qualityApproved": self.currentState = .buyerEnRoute

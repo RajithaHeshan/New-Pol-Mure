@@ -323,13 +323,14 @@ struct SellerContactCard: View {
 struct FSMTimelineTracker: View {
     let currentState: ContractState
     let isPulsing: Bool
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Logistics Tracker").font(.headline).padding(.bottom, 16)
-            TimelineRow(title: "Bid Accepted", subtitle: "Escrow secured. Contract generated.", isCompleted: currentState.rawValue >= 0, isActive: currentState == .bidAccepted, isPulsing: isPulsing, isLast: false)
-            TimelineRow(title: "Inspection Pending", subtitle: "Travel to estate to verify coconut quality.", isCompleted: currentState.rawValue > 1, isActive: currentState == .inspectionPending, isPulsing: isPulsing, isLast: false)
-            TimelineRow(title: "Payment Transfer", subtitle: "Funds released to seller after approval.", isCompleted: currentState.rawValue > 2, isActive: currentState == .paymentPending, isPulsing: isPulsing, isLast: true)
+            TimelineRow(title: "Contract Created", subtitle: "Bid accepted. Awaiting fund lock.", isCompleted: currentState.rawValue >= 0, isActive: currentState == .bidAccepted, isPulsing: isPulsing, isLast: false)
+            TimelineRow(title: "Funds Locked", subtitle: "Payment secured in escrow. Seller notified.", isCompleted: currentState.rawValue > 1, isActive: currentState == .fundsLocked, isPulsing: isPulsing, isLast: false)
+            TimelineRow(title: "Quality Inspection", subtitle: "Travel to estate to verify coconut quality.", isCompleted: currentState.rawValue > 2, isActive: currentState == .inspectionPending, isPulsing: isPulsing, isLast: false)
+            TimelineRow(title: "Payment Released", subtitle: "Funds transferred to seller after approval.", isCompleted: currentState.rawValue > 3, isActive: currentState == .paymentPending, isPulsing: isPulsing, isLast: true)
         }
         .padding().background(Color(UIColor.secondarySystemBackground)).cornerRadius(16)
     }
@@ -363,50 +364,88 @@ struct ContextualActionArea: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            if viewModel.currentState == .bidAccepted || viewModel.currentState == .inspectionPending {
-                if !viewModel.isLocationRevealed {
-                    // Date selection row — buyer picks their preferred inspection date/time
-                    Button(action: { viewModel.showDatePicker = true }) {
-                        HStack {
-                            Image(systemName: "calendar").foregroundColor(.blue)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Inspection Date").font(.caption).foregroundColor(.secondary)
-                                Text(viewModel.pendingPickerDate.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.subheadline.bold()).foregroundColor(.blue)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
-                        }
-                        .padding()
-                        .background(Color.blue.opacity(0.06))
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(.plain)
 
-                    Button(action: { viewModel.revealLocation() }) {
-                        Label("Reveal Exact Location", systemImage: "location.fill").font(.headline).frame(maxWidth: .infinity).padding().background(Color.blue.opacity(0.1)).foregroundColor(.blue).cornerRadius(12)
+            // STEP 1 — Lock Funds (escrow simulation)
+            if viewModel.currentState == .bidAccepted {
+                EscrowSummaryCard(amount: viewModel.amount, sellerName: viewModel.sellerName)
+
+                Button(action: { viewModel.lockFunds() }) {
+                    HStack {
+                        Image(systemName: "lock.shield.fill")
+                        Text("Lock Funds in Escrow")
+                            .font(.headline)
                     }
-                } else {
-                    Button(action: {
-                        viewModel.releaseFundsSimulation()
-                    }) {
-                        Label("Approve Quality", systemImage: "checkmark.seal.fill").font(.headline).frame(maxWidth: .infinity).padding().background(Color.green).foregroundColor(.white).cornerRadius(12)
-                    }
-                    Button(action: { viewModel.showDisputeModal = true }) {
-                        Text("Dispute / Renegotiate").font(.subheadline.bold()).frame(maxWidth: .infinity).padding().background(Color.red.opacity(0.1)).foregroundColor(.red).cornerRadius(12)
-                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(14)
                 }
+
+            // STEP 2 — Funds locked, now reveal location
+            } else if viewModel.currentState == .fundsLocked {
+                FundsLockedBanner()
+
+                Button(action: { viewModel.showDatePicker = true }) {
+                    HStack {
+                        Image(systemName: "calendar").foregroundColor(.blue)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Inspection Date").font(.caption).foregroundColor(.secondary)
+                            Text(viewModel.pendingPickerDate.formatted(date: .abbreviated, time: .shortened))
+                                .font(.subheadline.bold()).foregroundColor(.blue)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption).foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color.blue.opacity(0.06))
+                    .cornerRadius(12)
+                }
+                .buttonStyle(.plain)
+
+                Button(action: { viewModel.revealLocation() }) {
+                    Label("Reveal Exact Location", systemImage: "location.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(12)
+                }
+
+            // STEP 3 — At estate, approve or dispute
+            } else if viewModel.currentState == .inspectionPending {
+                Button(action: { viewModel.releaseFundsSimulation() }) {
+                    Label("Approve Quality & Release Funds", systemImage: "checkmark.seal.fill")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(14)
+                }
+                Button(action: { viewModel.showDisputeModal = true }) {
+                    Text("Dispute / Renegotiate")
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.red.opacity(0.1))
+                        .foregroundColor(.red)
+                        .cornerRadius(12)
+                }
+
+            // STEP 4 — Processing
             } else if viewModel.currentState == .paymentPending {
-                // The API Processing State
                 HStack(spacing: 12) {
                     ProgressView()
-                    Text("Waiting for Escrow to Release Funds...")
+                    Text("Releasing escrow funds to seller…")
                         .font(.subheadline.bold())
                         .foregroundColor(.secondary)
                 }
                 .padding()
+
+            // STEP 5 — Done
             } else if viewModel.currentState == .completed {
-                // The Final Success State
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.shield.fill")
                         .font(.largeTitle)
@@ -414,7 +453,7 @@ struct ContextualActionArea: View {
                     Text("Transaction Complete")
                         .font(.headline)
                         .foregroundColor(.green)
-                    Text("Escrow funds have been successfully transferred to the seller's bank account.")
+                    Text("Escrow funds have been successfully transferred to the seller's account.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -426,6 +465,83 @@ struct ContextualActionArea: View {
                 .transition(.scale.combined(with: .opacity))
             }
         }
+    }
+}
+
+// MARK: - Escrow Summary Card (shown before buyer locks funds)
+private struct EscrowSummaryCard: View {
+    let amount: Double
+    let sellerName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Image(systemName: "banknote.fill")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Escrow Payment Due")
+                        .font(.headline)
+                    Text("Funds are held securely until quality is approved.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Divider()
+            HStack {
+                Text("Amount to Lock")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("Rs \(String(format: "%.0f", amount))")
+                    .font(.title3.bold())
+                    .foregroundColor(.blue)
+            }
+            HStack {
+                Text("Recipient (on approval)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(sellerName)
+                    .font(.subheadline.bold())
+            }
+            HStack {
+                Text("Platform Fee (2%)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("Rs \(String(format: "%.0f", amount * 0.02))")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color.blue.opacity(0.05))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue.opacity(0.2), lineWidth: 1))
+    }
+}
+
+// MARK: - Funds Locked Banner (shown after lock, before reveal)
+private struct FundsLockedBanner: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.shield.fill")
+                .font(.title2)
+                .foregroundColor(.green)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Funds Secured in Escrow")
+                    .font(.subheadline.bold())
+                    .foregroundColor(.green)
+                Text("Payment is locked and will be released to the seller once you approve quality.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color.green.opacity(0.08))
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.green.opacity(0.25), lineWidth: 1))
     }
 }
 

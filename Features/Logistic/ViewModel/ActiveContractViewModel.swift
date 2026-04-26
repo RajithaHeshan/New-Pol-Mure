@@ -67,7 +67,7 @@ class ActiveContractViewModel {
         self.amount               = contract.amount
 
         self.currentState       = Self.mapStatus(contract.status)
-        self.isLocationRevealed = contract.status != "escrow" && contract.status != "bidAccepted" && contract.status != ""
+        self.isLocationRevealed = contract.status == "inspection" || contract.status == "dispute" || contract.status == "qualityApproved" || contract.status == "payment" || contract.status == "completed"
 
         if let savedDate = contract.inspectionDate {
             self.inspectionDate    = savedDate
@@ -96,7 +96,7 @@ class ActiveContractViewModel {
                 if let status = data["status"] as? String {
                     withAnimation(.spring()) {
                         self.currentState       = Self.mapStatus(status)
-                        self.isLocationRevealed = status != "escrow" && status != "bidAccepted" && status != ""
+                        self.isLocationRevealed = status == "inspection" || status == "dispute" || status == "qualityApproved" || status == "payment" || status == "completed"
                     }
                 }
 
@@ -113,12 +113,24 @@ class ActiveContractViewModel {
     private static func mapStatus(_ status: String) -> ContractState {
         switch status {
         case "escrow":          return .bidAccepted
+        case "fundsLocked":     return .fundsLocked
         case "inspection":      return .inspectionPending
         case "dispute":         return .inspectionPending
         case "qualityApproved": return .paymentPending
         case "payment":         return .paymentPending
         case "completed":       return .completed
         default:                return .bidAccepted
+        }
+    }
+
+    // MARK: - Lock Funds → buyer confirms escrow, advances contract to fundsLocked
+    func lockFunds() {
+        withAnimation(.spring()) { currentState = .fundsLocked }
+        Task {
+            try? await Firestore.firestore()
+                .collection("contracts")
+                .document(contractID)
+                .updateData(["status": "fundsLocked"])
         }
     }
 
