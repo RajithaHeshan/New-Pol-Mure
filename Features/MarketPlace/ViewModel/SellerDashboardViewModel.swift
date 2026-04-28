@@ -228,6 +228,9 @@ class SellerDashboardViewModel {
                 let cert = data["certificationLevel"] as? String ?? ""
                 self.sellerHasExport = cert.lowercased().contains("export")
 
+                // Re-score now that seller profile is loaded with correct volume
+                self.computeMLRecommendations()
+
             } catch {
                 print("Firebase Fetch Error: \(error.localizedDescription)")
             }
@@ -277,6 +280,7 @@ class SellerDashboardViewModel {
                             locationName: location,
                             coordinate: coordinate,
                             typicalVolume: volume,
+                            businessType: data["businessType"] as? String ?? "",
                             rating: data["averageRating"] as? Double ?? 0.0,
                             ratingCount: data["ratingCount"] as? Int ?? 0,
                             isUrgent: data["isUrgent"] as? Bool ?? false
@@ -323,7 +327,7 @@ class SellerDashboardViewModel {
 
         let scored: [(RegisteredBuyer, Double)] = allBuyers.map { buyer in
             let buyerVolume = RecommendationEngine.parseVolume(buyer.typicalVolume)
-            let buyerNeedsExport = buyer.typicalVolume.lowercased().contains("export")
+            let buyerNeedsExport = buyer.businessType.lowercased().contains("export")
             let buyerOffer = lowestOfferPerBuyer[buyer.id] ?? 0
             let priceDelta = buyerOffer - avgMarketOffer
             let txCount = historicalTransactions[buyer.id] ?? 0
@@ -428,6 +432,7 @@ class SellerDashboardViewModel {
             locationName: post.location,
             coordinate: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
             typicalVolume: "\(post.quantity)",
+            businessType: "",
             rating: 0.0,
             ratingCount: 0,
             isUrgent: true
@@ -435,10 +440,11 @@ class SellerDashboardViewModel {
     }
 
     // ML-powered: returns top-5 buyers scored by the CoreML model.
-    // Falls back to distance sort when the cache is empty (first load / model unavailable).
+    // Returns empty while loading so UI shows ProgressView, not a flickering distance-sort list.
     var recommendedBuyers: [RegisteredBuyer] {
         if !mlRecommendedBuyers.isEmpty { return mlRecommendedBuyers }
-
+        if isLoadingBuyers { return [] }
+        // Model unavailable fallback — distance sort
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allBuyers
             .sorted { b1, b2 in
