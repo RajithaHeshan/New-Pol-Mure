@@ -60,12 +60,24 @@ class SellerDashboardViewModel {
     private var disputeContract:  Contract? = nil
     private var approvedContract: Contract? = nil
 
+    // MARK: - Seller Profile (used by ML engine)
+    private var sellerVolume: Int = 5000
+    private var sellerHasExport: Bool = false
+
+    // MARK: - Historical Transactions Per Buyer (buyerID → count of completed contracts)
+    private var historicalTransactions: [String: Int] = [:]
+    private let historyListenerBox = DashboardListenerBox()
+
+    // MARK: - ML-Scored Recommendations Cache
+    var mlRecommendedBuyers: [RegisteredBuyer] = []
+
     init() {
         fetchUserProfile()
         attachBuyersListener()
         attachOffersListener()
         attachUrgentListeners()
         attachUrgentRequestsListener()
+        attachContractsHistoryListener()
     }
 
     // Called from .onAppear so listeners are (re)attached after auth is fully restored
@@ -101,6 +113,7 @@ class SellerDashboardViewModel {
                     }
                 }
                 self.lowestOfferPerBuyer = map
+                self.computeMLRecommendations()
 
                 // activeOffersTotal = sum of the lowest pitch won per buyer by this seller
                 let sellerID = AuthManager.shared.currentUserID
@@ -196,16 +209,25 @@ class SellerDashboardViewModel {
         Task {
             do {
                 let document = try await Firestore.firestore().collection("users").document(userId).getDocument()
+                let data = document.data() ?? [:]
 
-                if let imageName = document.data()?["profileImageName"] as? String {
+                if let imageName = data["profileImageName"] as? String {
                     self.profileImageName = imageName
                 }
 
                 // Center map on seller's own estate location
-                if let lat = document.data()?["latitude"] as? Double,
-                   let lng = document.data()?["longitude"] as? Double {
+                if let lat = data["latitude"] as? Double,
+                   let lng = data["longitude"] as? Double {
                     self.searchCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 }
+
+                // Decode seller profile for ML scoring
+                if let yield = data["typicalYield"] as? String {
+                    self.sellerVolume = RecommendationEngine.parseVolume(yield)
+                }
+                let cert = data["certificationLevel"] as? String ?? ""
+                self.sellerHasExport = cert.lowercased().contains("export")
+
             } catch {
                 print("Firebase Fetch Error: \(error.localizedDescription)")
             }
@@ -262,10 +284,68 @@ class SellerDashboardViewModel {
                     }
                     self.allBuyers = buyers
                     self.isLoadingBuyers = false
+                    self.computeMLRecommendations()
                 }
             }
     }
 
+
+    // MARK: - Contracts History Listener (tracks per-buyer historical transactions for this seller)
+    private func attachContractsHistoryListener() {
+        let sellerID = AuthManager.shared.currentUserID
+        guard !sellerID.isEmpty else { return }
+
+        historyListenerBox.listener = Firestore.firestore()
+            .collection("contracts")
+            .whereField("sellerID", isEqualTo: sellerID)
+            .whereField("status", isEqualTo: "completed")
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+                var counts: [String: Int] = [:]
+                for doc in docs {
+                    let buyerID = (doc.data()["buyerID"] as? String) ?? ""
+                    if !buyerID.isEmpty {
+                        counts[buyerID, default: 0] += 1
+                    }
+                }
+                self.historicalTransactions = counts
+                self.computeMLRecommendations()
+            }
+    }
+
+    // MARK: - ML Recommendation Scoring
+    // Scores every registered buyer using the CoreML model and caches top 5.
+    func computeMLRecommendations() {
+        guard !allBuyers.isEmpty else { return }
+
+        let engine = RecommendationEngine.shared
+        let avgMarketOffer = lowestOfferPerBuyer.values.reduce(0, +) / max(1, Double(lowestOfferPerBuyer.count))
+
+        let scored: [(RegisteredBuyer, Double)] = allBuyers.map { buyer in
+            let buyerVolume = RecommendationEngine.parseVolume(buyer.typicalVolume)
+            let buyerNeedsExport = buyer.typicalVolume.lowercased().contains("export")
+            let buyerOffer = lowestOfferPerBuyer[buyer.id] ?? 0
+            let priceDelta = buyerOffer - avgMarketOffer
+            let txCount = historicalTransactions[buyer.id] ?? 0
+
+            let score = engine.scoreBuyerForSeller(
+                sellerVolume: sellerVolume,
+                buyerVolume: buyerVolume,
+                sellerLocation: searchCenter,
+                buyerLocation: buyer.coordinate,
+                sellerHasExport: sellerHasExport,
+                buyerNeedsExport: buyerNeedsExport,
+                priceDelta: priceDelta,
+                historicalTransactions: txCount
+            )
+            return (buyer, score)
+        }
+
+        mlRecommendedBuyers = scored
+            .sorted { $0.1 > $1.1 }
+            .prefix(5)
+            .map { $0.0 }
+    }
 
     private func geocode(locationName: String) async -> CLLocationCoordinate2D? {
         let request = MKLocalSearch.Request()
@@ -354,7 +434,11 @@ class SellerDashboardViewModel {
         )
     }
 
+    // ML-powered: returns top-5 buyers scored by the CoreML model.
+    // Falls back to distance sort when the cache is empty (first load / model unavailable).
     var recommendedBuyers: [RegisteredBuyer] {
+        if !mlRecommendedBuyers.isEmpty { return mlRecommendedBuyers }
+
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allBuyers
             .sorted { b1, b2 in

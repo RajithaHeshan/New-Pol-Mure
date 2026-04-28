@@ -48,12 +48,24 @@ class DiscoveryDashboardViewModel {
     var sellerRatings: [String: (Double, Int)] = [:]
     private var sellerRatingsListener: ListenerRegistration?
 
+    // MARK: - Buyer Profile (used by ML engine)
+    private var buyerVolume: Int = 5000
+    private var buyerNeedsExport: Bool = false
+
+    // MARK: - Historical Transactions Per Seller (sellerID → count of completed contracts)
+    private var historicalTransactions: [String: Int] = [:]
+    private var contractsListener: ListenerRegistration?
+
+    // MARK: - ML-Scored Recommendations Cache
+    var mlRecommendedSellers: [SellerLocation] = []
+
     init() {
         fetchUserProfile()
         fetchSellers()
         attachBidsListener()
         attachHarvestsListener()
         attachSellerRatingsListener()
+        attachContractsListener()
         requestNotificationPermission()
     }
 
@@ -65,10 +77,22 @@ class DiscoveryDashboardViewModel {
         Task {
             do {
                 let document = try await Firestore.firestore().collection("users").document(userId).getDocument()
+                let data = document.data() ?? [:]
 
-                // Fetch the asset string we saved during registration
-                if let imageName = document.data()?["profileImageName"] as? String {
+                if let imageName = data["profileImageName"] as? String {
                     self.profileImageName = imageName
+                }
+
+                // Decode buyer profile for ML scoring
+                if let vol = data["typicalVolume"] as? String {
+                    self.buyerVolume = RecommendationEngine.parseVolume(vol)
+                }
+                self.buyerNeedsExport = (data["needsExport"] as? Bool) ?? false
+
+                // Centre map on buyer's registered location
+                if let lat = data["latitude"] as? Double,
+                   let lng = data["longitude"] as? Double {
+                    self.searchCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 }
             } catch {
                 print("Error fetching profile from Firestore: \(error.localizedDescription)")
@@ -135,6 +159,7 @@ class DiscoveryDashboardViewModel {
 
                 self.allSellers = sellers
                 self.isLoadingSellers = false
+                self.computeMLRecommendations()
 
             } catch {
                 print("Error fetching sellers from Firestore: \(error.localizedDescription)")
@@ -170,6 +195,7 @@ class DiscoveryDashboardViewModel {
                     }
                 }
                 self.highestBids = bids
+                self.computeMLRecommendations()
             }
     }
 
@@ -231,6 +257,63 @@ class DiscoveryDashboardViewModel {
     // MARK: - Notification Permission
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
+    }
+
+    // MARK: - Contracts Listener (tracks historical buyer–seller transaction counts)
+    private func attachContractsListener() {
+        let buyerID = AuthManager.shared.currentUserID
+        guard !buyerID.isEmpty else { return }
+
+        contractsListener = Firestore.firestore()
+            .collection("contracts")
+            .whereField("buyerID", isEqualTo: buyerID)
+            .whereField("status", isEqualTo: "completed")
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+                var counts: [String: Int] = [:]
+                for doc in docs {
+                    let sellerID = (doc.data()["sellerID"] as? String) ?? ""
+                    if !sellerID.isEmpty {
+                        counts[sellerID, default: 0] += 1
+                    }
+                }
+                self.historicalTransactions = counts
+                self.computeMLRecommendations()
+            }
+    }
+
+    // MARK: - ML Recommendation Scoring
+    // Scores every seller using the CoreML model and caches top 5 in mlRecommendedSellers.
+    func computeMLRecommendations() {
+        guard !allSellers.isEmpty else { return }
+
+        let engine = RecommendationEngine.shared
+        let avgMarketBid = highestBids.values.reduce(0, +) / max(1, Double(highestBids.count))
+
+        let scored: [(SellerLocation, Double)] = allSellers.map { seller in
+            let sellerVolume = RecommendationEngine.parseVolume(seller.typicalYield)
+            let sellerHasExport = seller.certificationLevel.lowercased().contains("export")
+            let sellerBid = highestBids[seller.id] ?? 0
+            let priceDelta = sellerBid - avgMarketBid
+            let txCount = historicalTransactions[seller.id] ?? 0
+
+            let score = engine.scoreSellerForBuyer(
+                buyerVolume: buyerVolume,
+                sellerVolume: sellerVolume,
+                buyerLocation: searchCenter,
+                sellerLocation: seller.coordinate,
+                buyerNeedsExport: buyerNeedsExport,
+                sellerHasExport: sellerHasExport,
+                priceDelta: priceDelta,
+                historicalTransactions: txCount
+            )
+            return (seller, score)
+        }
+
+        mlRecommendedSellers = scored
+            .sorted { $0.1 > $1.1 }
+            .prefix(5)
+            .map { $0.0 }
     }
 
     // MARK: - Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
@@ -306,8 +389,11 @@ class DiscoveryDashboardViewModel {
         return results
     }
 
-   
+    // ML-powered: returns top-5 sellers scored by the CoreML model.
+    // Falls back to distance sort when the cache is empty (first load / model unavailable).
     var recommendedSellers: [SellerLocation] {
+        if !mlRecommendedSellers.isEmpty { return mlRecommendedSellers }
+
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allSellers
             .sorted { s1, s2 in

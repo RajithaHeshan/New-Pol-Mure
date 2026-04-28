@@ -206,7 +206,7 @@ struct HarvestCreateModalView: View {
                     Text("Harvest Details")
                 }
 
-                // MARK: - Market Suggestion
+             
                 if viewModel.isReadyForSuggestion {
                     Section {
                         VStack(alignment: .leading, spacing: 10) {
