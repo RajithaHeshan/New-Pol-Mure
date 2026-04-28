@@ -96,6 +96,9 @@ class DiscoveryDashboardViewModel {
                    let lng = data["longitude"] as? Double {
                     self.searchCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 }
+
+                // Re-score now that buyer profile is loaded with correct volume
+                self.computeMLRecommendations()
             } catch {
                 print("Error fetching profile from Firestore: \(error.localizedDescription)")
             }
@@ -414,10 +417,12 @@ class DiscoveryDashboardViewModel {
     }
 
     // ML-powered: returns top-5 sellers scored by the CoreML model.
-    // Falls back to distance sort when the cache is empty (first load / model unavailable).
+    // Returns empty while loading so UI shows ProgressView, not a flickering distance-sort list.
     var recommendedSellers: [SellerLocation] {
         if !mlRecommendedSellers.isEmpty { return mlRecommendedSellers }
-
+        // Still loading — return empty so ProgressView shows instead of wrong order
+        if isLoadingSellers { return [] }
+        // Model unavailable fallback — distance sort
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allSellers
             .sorted { s1, s2 in

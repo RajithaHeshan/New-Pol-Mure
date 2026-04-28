@@ -2,8 +2,7 @@ import Foundation
 import CoreML
 import CoreLocation
 
-// Wraps the trained CoreML tabular regressor and exposes clean scoring methods
-// for both buyer→seller and seller→buyer matching.
+
 final class RecommendationEngine {
 
     static let shared = RecommendationEngine()
@@ -14,14 +13,7 @@ final class RecommendationEngine {
         model = try? MyTabularRegressor_for_cocount_recommendation_feature_1(configuration: MLModelConfiguration())
     }
 
-    // MARK: - Buyer → Seller Score
-    // Returns a MatchScore (0–100) representing how well a seller fits this buyer.
-    // buyerVolume / sellerVolume: parsed from typicalVolume / typicalYield strings (in nuts)
-    // distanceKM: straight-line distance between buyer and seller coordinates
-    // buyerNeedsExport: 1 if buyer requires export grade, 0 otherwise
-    // sellerHasExport: 1 if seller's certificationLevel is "Export", 0 otherwise
-    // priceDelta: difference between seller's current highest bid and the market average
-    // historicalTransactions: number of completed contracts between this buyer–seller pair
+    
     func scoreSellerForBuyer(
         buyerVolume: Int,
         sellerVolume: Int,
