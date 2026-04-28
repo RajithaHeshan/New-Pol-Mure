@@ -59,6 +59,7 @@ class DiscoveryDashboardViewModel {
 
     // MARK: - ML-Scored Recommendations Cache
     var mlRecommendedSellers: [SellerLocation] = []
+    var mlRecommendedHarvests: [HarvestLotItem] = []
 
     init() {
         fetchUserProfile()
@@ -244,6 +245,7 @@ class DiscoveryDashboardViewModel {
                     HarvestLotItem(id: $0.documentID, data: $0.data())
                 }.sorted { $0.createdAt > $1.createdAt } ?? []
                 self.isLoadingHarvests = false
+                self.computeMLRecommendations()
             }
     }
 
@@ -276,37 +278,66 @@ class DiscoveryDashboardViewModel {
     }
 
     // MARK: - ML Recommendation Scoring
-    // Scores every seller using the CoreML model and caches top 5 in mlRecommendedSellers.
+    // Scores registered sellers AND harvest lots, caches top 5 of each.
     func computeMLRecommendations() {
-        guard !allSellers.isEmpty else { return }
-
         let engine = RecommendationEngine.shared
         let avgMarketBid = highestBids.values.reduce(0, +) / max(1, Double(highestBids.count))
 
-        let scored: [(SellerLocation, Double)] = allSellers.map { seller in
-            let sellerVolume = RecommendationEngine.parseVolume(seller.typicalYield)
-            let sellerHasExport = seller.certificationLevel.lowercased().contains("export")
-            let sellerBid = highestBids[seller.id] ?? 0
-            let priceDelta = sellerBid - avgMarketBid
-            let txCount = historicalTransactions[seller.id] ?? 0
+        // Score registered sellers
+        if !allSellers.isEmpty {
+            let scoredSellers: [(SellerLocation, Double)] = allSellers.map { seller in
+                let sellerVolume    = RecommendationEngine.parseVolume(seller.typicalYield)
+                let sellerHasExport = seller.certificationLevel.lowercased().contains("export")
+                let sellerBid       = highestBids[seller.id] ?? 0
+                let priceDelta      = sellerBid - avgMarketBid
+                let txCount         = historicalTransactions[seller.id] ?? 0
 
-            let score = engine.scoreSellerForBuyer(
-                buyerVolume: buyerVolume,
-                sellerVolume: sellerVolume,
-                buyerLocation: searchCenter,
-                sellerLocation: seller.coordinate,
-                buyerNeedsExport: buyerNeedsExport,
-                sellerHasExport: sellerHasExport,
-                priceDelta: priceDelta,
-                historicalTransactions: txCount
-            )
-            return (seller, score)
+                let score = engine.scoreSellerForBuyer(
+                    buyerVolume: buyerVolume,
+                    sellerVolume: sellerVolume,
+                    buyerLocation: searchCenter,
+                    sellerLocation: seller.coordinate,
+                    buyerNeedsExport: buyerNeedsExport,
+                    sellerHasExport: sellerHasExport,
+                    priceDelta: priceDelta,
+                    historicalTransactions: txCount
+                )
+                return (seller, score)
+            }
+            mlRecommendedSellers = scoredSellers
+                .sorted { $0.1 > $1.1 }
+                .prefix(5)
+                .map { $0.0 }
         }
 
-        mlRecommendedSellers = scored
-            .sorted { $0.1 > $1.1 }
-            .prefix(5)
-            .map { $0.0 }
+        // Score harvest lots — use their own quantity and the seller's certification from sellerRatings
+        if !activeHarvests.isEmpty {
+            let scoredHarvests: [(HarvestLotItem, Double)] = activeHarvests.map { harvest in
+                let harvestVolume   = harvest.quantity
+                let harvestHasExport = harvest.qualityGrade.lowercased().contains("export")
+                let harvestLocation  = CLLocationCoordinate2D(latitude: harvest.latitude, longitude: harvest.longitude)
+                let harvestBid       = highestBids[harvest.id] ?? harvest.currentBid
+                let priceDelta       = harvestBid - avgMarketBid
+                // Use seller-level historical transaction count for this harvest's seller
+                let txCount          = historicalTransactions[harvest.sellerID] ?? 0
+
+                let score = engine.scoreSellerForBuyer(
+                    buyerVolume: buyerVolume,
+                    sellerVolume: harvestVolume,
+                    buyerLocation: searchCenter,
+                    sellerLocation: harvestLocation,
+                    buyerNeedsExport: buyerNeedsExport,
+                    sellerHasExport: harvestHasExport,
+                    priceDelta: priceDelta,
+                    historicalTransactions: txCount
+                )
+                return (harvest, score)
+            }
+            mlRecommendedHarvests = scoredHarvests
+                .sorted { $0.1 > $1.1 }
+                .prefix(5)
+                .map { $0.0 }
+        }
     }
 
     // MARK: - Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)

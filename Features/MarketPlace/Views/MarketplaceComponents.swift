@@ -117,6 +117,94 @@ struct RecommendedSellerCard: View {
     }
 }
 
+// MARK: - Recommended Harvest Card (horizontal scroll in Recommended For You)
+struct RecommendedHarvestCard: View {
+    let harvest: HarvestLotItem
+    let currentHighestBid: Double
+    var sellerRating: Double = 0.0
+    var sellerRatingCount: Int = 0
+
+    var body: some View {
+        NavigationLink(value: harvest.id) {
+            VStack(alignment: .leading) {
+                // Map thumbnail showing harvest location
+                Map(interactionModes: []) {
+                    MapCircle(
+                        center: CLLocationCoordinate2D(latitude: harvest.latitude, longitude: harvest.longitude),
+                        radius: 4000
+                    )
+                    .foregroundStyle(.green.opacity(0.3))
+                    Annotation(
+                        harvest.propertyName.isEmpty ? harvest.sellerName : harvest.propertyName,
+                        coordinate: CLLocationCoordinate2D(latitude: harvest.latitude, longitude: harvest.longitude)
+                    ) {
+                        Image(systemName: "leaf.fill")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.green)
+                            .clipShape(Circle())
+                    }
+                }
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    // Property name badge
+                    if !harvest.propertyName.isEmpty {
+                        Text(harvest.propertyName)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                    Text(harvest.sellerName)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Text(harvest.locationName)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+
+                    StarRatingBadge(rating: sellerRating, count: sellerRatingCount)
+                        .padding(.top, 2)
+
+                    HStack {
+                        Text("\(harvest.quantity) Nuts")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.green)
+                        Spacer()
+                        Text("Rs \(String(format: "%.0f", currentHighestBid))")
+                            .font(.caption.bold())
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                    .padding(.top, 4)
+
+                    // Quality grade tag
+                    Text(harvest.qualityGrade)
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color.orange.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+                .padding(.top, 8)
+            }
+            .frame(width: 240)
+            .padding(12)
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(16)
+            .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
 // MARK: - Seller Row (Vertical List)
 struct SellerRow: View {
     let seller: SellerLocation

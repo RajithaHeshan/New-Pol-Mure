@@ -73,17 +73,33 @@ struct DiscoveryDashboardView: View {
                 .font(.title3.bold())
                 .padding(.horizontal)
 
-            if viewModel.isLoadingSellers {
+            let isLoading = viewModel.isLoadingSellers || viewModel.isLoadingHarvests
+            let hasContent = !viewModel.recommendedSellers.isEmpty || !viewModel.mlRecommendedHarvests.isEmpty
+
+            if isLoading {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 20)
-            } else if viewModel.recommendedSellers.isEmpty {
+            } else if !hasContent {
                 Text("No sellers available yet.")
                     .font(.subheadline).foregroundColor(.secondary)
                     .padding(.horizontal).padding(.top, 8)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 16) {
+                        // Registered sellers
                         ForEach(viewModel.recommendedSellers) { seller in
-                            RecommendedSellerCard(seller: seller, currentHighestBid: viewModel.highestBid(for: seller))
+                            RecommendedSellerCard(
+                                seller: seller,
+                                currentHighestBid: viewModel.highestBid(for: seller)
+                            )
+                        }
+                        // Harvest lots created by sellers
+                        ForEach(viewModel.mlRecommendedHarvests) { harvest in
+                            RecommendedHarvestCard(
+                                harvest: harvest,
+                                currentHighestBid: viewModel.highestBid(for: harvest),
+                                sellerRating: viewModel.sellerRatings[harvest.sellerID]?.0 ?? 0.0,
+                                sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0
+                            )
                         }
                     }
                     .padding(.horizontal)
