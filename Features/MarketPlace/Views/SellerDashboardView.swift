@@ -249,47 +249,7 @@ struct SellerDashboardView: View {
             }
 
             .sheet(isPresented: $viewModel.showProfile) {
-                NavigationStack {
-                    VStack(spacing: 24) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-
-                        Text("Developer Options")
-                            .font(.title2.bold())
-
-                        Text("Use these tools during testing to clear your cache and database connections.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-
-                        Button(action: {
-                            AuthManager.shared.signOut()
-                            viewModel.showProfile = false
-                        }) {
-                            Text("Log Out (Clear Session)")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red)
-                                .cornerRadius(12)
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 20)
-
-                        Spacer()
-                    }
-                    .padding(.top, 40)
-                    .navigationTitle("Profile")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { viewModel.showProfile = false }
-                        }
-                    }
-                }
+                ProfileView()
             }
             .sheet(isPresented: $viewModel.showNotifications) {
                 NavigationStack {

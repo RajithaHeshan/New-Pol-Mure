@@ -31,9 +31,10 @@ class DiscoveryDashboardViewModel {
     var isSearchingLocation = false
     private var searchTask: Task<Void, Never>?
 
-    // MARK: - Sellers Data (Loaded from Firestore)
+    // MARK: - Sellers Data (Real-time listener)
     var allSellers: [SellerLocation] = []
     var isLoadingSellers = false
+    private var sellersListener: ListenerRegistration?
 
     // MARK: - Highest Bids Per Seller (sellerID → highest bid amount)
     var highestBids: [String: Double] = [:]
@@ -61,7 +62,7 @@ class DiscoveryDashboardViewModel {
 
     init() {
         fetchUserProfile()
-        fetchSellers()
+        attachSellersListener()
         attachBidsListener()
         attachHarvestsListener()
         attachSellerRatingsListener()
@@ -100,72 +101,64 @@ class DiscoveryDashboardViewModel {
         }
     }
 
-    // MARK: - Fetch Sellers from Firestore
-    func fetchSellers() {
+    // MARK: - Real-Time Sellers Listener
+    // Replaces one-shot fetch so profile edits (yield, cert, location) appear immediately on the buyer side.
+    private func attachSellersListener() {
         isLoadingSellers = true
-
-        Task {
-            do {
-                let snapshot = try await Firestore.firestore()
-                    .collection("users")
-                    .whereField("role", isEqualTo: "SELLER")
-                    .getDocuments()
-
-                var sellers: [SellerLocation] = []
-
-                for doc in snapshot.documents {
-                    let data = doc.data()
-
-                    guard
-                        let name = data["fullName"] as? String,
-                        let location = data["locationName"] as? String
-                    else { continue }
-
-                    let yield = data["typicalYield"] as? String ?? "N/A"
-                    let cert = data["certificationLevel"] as? String ?? "Standard"
-                    let harvestTimestamp = data["nextHarvestDate"] as? Timestamp
-                    let harvestDate = harvestTimestamp?.dateValue() ?? Date()
-
-                    // Use stored coordinates if present, otherwise geocode locationName
-                    let coordinate: CLLocationCoordinate2D
-                    if let lat = data["latitude"] as? Double,
-                       let lng = data["longitude"] as? Double {
-                        coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
-                    } else {
-                        // Geocode the locationName and backfill Firestore so this only runs once
-                        if let resolved = await geocode(locationName: location) {
-                            coordinate = resolved
-                            try? await Firestore.firestore()
-                                .collection("users")
-                                .document(doc.documentID)
-                                .updateData(["latitude": resolved.latitude, "longitude": resolved.longitude])
-                        } else {
-                            continue
-                        }
-                    }
-
-                    sellers.append(SellerLocation(
-                        id: doc.documentID,
-                        sellerName: name,
-                        locationName: location,
-                        coordinate: coordinate,
-                        typicalYield: yield,
-                        certificationLevel: cert,
-                        nextHarvestDate: harvestDate,
-                        averageRating: data["averageRating"] as? Double ?? 0.0,
-                        ratingCount: data["ratingCount"] as? Int ?? 0
-                    ))
+        sellersListener = Firestore.firestore()
+            .collection("users")
+            .whereField("role", isEqualTo: "SELLER")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self else { return }
+                if let error {
+                    print("Sellers listener error: \(error.localizedDescription)")
+                    self.isLoadingSellers = false
+                    return
                 }
+                Task {
+                    var sellers: [SellerLocation] = []
+                    for doc in snapshot?.documents ?? [] {
+                        let data = doc.data()
+                        guard
+                            let name     = data["fullName"]     as? String,
+                            let location = data["locationName"] as? String
+                        else { continue }
 
-                self.allSellers = sellers
-                self.isLoadingSellers = false
-                self.computeMLRecommendations()
+                        let yield         = data["typicalYield"]       as? String ?? "N/A"
+                        let cert          = data["certificationLevel"] as? String ?? "Standard"
+                        let harvestDate   = (data["nextHarvestDate"] as? Timestamp)?.dateValue() ?? Date()
 
-            } catch {
-                print("Error fetching sellers from Firestore: \(error.localizedDescription)")
-                self.isLoadingSellers = false
+                        let coordinate: CLLocationCoordinate2D
+                        if let lat = data["latitude"] as? Double,
+                           let lng = data["longitude"] as? Double {
+                            coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                        } else {
+                            if let resolved = await self.geocode(locationName: location) {
+                                coordinate = resolved
+                                try? await Firestore.firestore()
+                                    .collection("users")
+                                    .document(doc.documentID)
+                                    .updateData(["latitude": resolved.latitude, "longitude": resolved.longitude])
+                            } else { continue }
+                        }
+
+                        sellers.append(SellerLocation(
+                            id: doc.documentID,
+                            sellerName: name,
+                            locationName: location,
+                            coordinate: coordinate,
+                            typicalYield: yield,
+                            certificationLevel: cert,
+                            nextHarvestDate: harvestDate,
+                            averageRating: data["averageRating"] as? Double ?? 0.0,
+                            ratingCount:   data["ratingCount"]   as? Int    ?? 0
+                        ))
+                    }
+                    self.allSellers = sellers
+                    self.isLoadingSellers = false
+                    self.computeMLRecommendations()
+                }
             }
-        }
     }
 
     // MARK: - Real-Time Bids Listener

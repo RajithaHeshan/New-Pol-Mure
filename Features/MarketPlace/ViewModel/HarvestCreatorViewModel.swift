@@ -50,6 +50,23 @@ class HarvestCreatorViewModel {
     var launchError: String? = nil
     var launchSuccess = false
 
+    // MARK: - Edit State
+    var editingHarvest: HarvestLotItem? = nil   // non-nil = edit sheet open
+    var editPropertyName: String = ""
+    var editQuantity: String = ""
+    var editQualityGrade: String = ""
+    var editStartingPrice: String = ""
+    var editHarvestDate: Date = Date()
+    var editLocationName: String = ""
+    var editEstateLocation = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
+    var editInlineCameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609),
+        latitudinalMeters: 5000, longitudinalMeters: 5000
+    ))
+    var isEditMapPresented = false
+    var isSavingEdit = false
+    var editError: String? = nil
+
     private var currentSellerID:   String = ""
     private var currentSellerName: String = ""
     private var sellerLocationName: String = ""
@@ -120,6 +137,60 @@ class HarvestCreatorViewModel {
     func deleteHarvest(_ harvest: HarvestLotItem) {
         Firestore.firestore().collection("harvestLots").document(harvest.id).delete { error in
             if let error { print("Delete harvest error: \(error.localizedDescription)") }
+        }
+    }
+
+    // MARK: - Edit Harvest — populate edit fields then open sheet
+    func startEditing(_ harvest: HarvestLotItem) {
+        editPropertyName   = harvest.propertyName
+        editQuantity       = "\(harvest.quantity)"
+        editQualityGrade   = harvest.qualityGrade
+        editStartingPrice  = String(format: "%.0f", harvest.startingPrice)
+        editHarvestDate    = harvest.endDate
+        editLocationName   = harvest.locationName
+        editEstateLocation = CLLocationCoordinate2D(latitude: harvest.latitude, longitude: harvest.longitude)
+        editInlineCameraPosition = .region(MKCoordinateRegion(
+            center: editEstateLocation,
+            latitudinalMeters: 5000, longitudinalMeters: 5000
+        ))
+        editingHarvest = harvest
+    }
+
+    // MARK: - Save Edited Harvest to Firestore
+    func saveEdit(onSuccess: @escaping @MainActor () -> Void = {}) {
+        guard
+            let harvest = editingHarvest,
+            let qty = Int(editQuantity), qty > 0,
+            let price = Double(editStartingPrice), price > 0
+        else { return }
+
+        isSavingEdit = true
+        editError    = nil
+
+        let update: [String: Any] = [
+            "propertyName":  editPropertyName,
+            "quantity":      qty,
+            "qualityGrade":  editQualityGrade,
+            "startingPrice": price,
+            "locationName":  editLocationName,
+            "latitude":      editEstateLocation.latitude,
+            "longitude":     editEstateLocation.longitude,
+            "harvestDate":   Timestamp(date: editHarvestDate)
+        ]
+
+        Task {
+            do {
+                try await Firestore.firestore()
+                    .collection("harvestLots")
+                    .document(harvest.id)
+                    .updateData(update)
+                isSavingEdit   = false
+                editingHarvest = nil
+                await onSuccess()
+            } catch {
+                editError    = error.localizedDescription
+                isSavingEdit = false
+            }
         }
     }
 
