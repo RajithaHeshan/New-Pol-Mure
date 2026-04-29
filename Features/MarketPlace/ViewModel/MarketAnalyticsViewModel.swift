@@ -281,24 +281,30 @@ class MarketAnalyticsViewModel {
 
     // MARK: - Dynamic Insight
     private func updateInsight() {
-        let zoneName = selectedZone.id == "all" ? "Sri Lanka" : selectedZone.displayName
+        let zoneName   = selectedZone.id == "all" ? "Sri Lanka" : selectedZone.displayName
+        let priceStr   = String(format: "%.0f", currentMarketAverage)
+        let changeStr  = String(format: "%.1f", abs(weeklyChangePercent))
 
         if hasNoData {
-            marketInsight = "No bid data yet for \(zoneName). Check back after the first bids are placed in this zone."
+            marketInsight = "No transactions recorded in \(zoneName) yet. Once buyers and sellers start trading here, you will see live price trends."
             return
         }
 
         switch weeklyChangePercent {
-        case let x where x > 10:
-            marketInsight = "Prices in \(zoneName) are rising sharply this week. Sellers should list now to capture peak demand."
+        case let x where x > 15:
+            marketInsight = "Prices in \(zoneName) jumped \(changeStr)% this week and are now at Rs \(priceStr) per nut. If you are a seller, this is a great time to list — demand is high. If you are a buyer, act fast before prices go higher."
+        case let x where x > 5:
+            marketInsight = "Prices in \(zoneName) are going up — currently Rs \(priceStr) per nut, up \(changeStr)% from last week. Sellers are in a strong position. Buyers should place bids soon."
         case let x where x > 0:
-            marketInsight = "Prices in \(zoneName) are trending upwards. Competition is moderate — a well-timed bid can secure a good deal."
-        case let x where x < -10:
-            marketInsight = "Prices in \(zoneName) have dropped significantly this week. Buyers have stronger negotiating power right now."
+            marketInsight = "Prices in \(zoneName) are slightly higher this week at Rs \(priceStr) per nut (+\(changeStr)%). The market is steady. Both buyers and sellers can trade with confidence."
+        case let x where x < -15:
+            marketInsight = "Prices in \(zoneName) dropped \(changeStr)% this week to Rs \(priceStr) per nut. Buyers have strong negotiating power right now. Sellers should try to secure a deal quickly to avoid holding stock too long."
+        case let x where x < -5:
+            marketInsight = "Prices in \(zoneName) are softer this week at Rs \(priceStr) per nut, down \(changeStr)%. Buyers can negotiate better deals. Sellers should pitch early to lock in a buyer before prices drop further."
         case let x where x < 0:
-            marketInsight = "Prices in \(zoneName) are slightly softer this week. A good opportunity for buyers to secure stock at competitive rates."
+            marketInsight = "Prices in \(zoneName) are slightly lower this week at Rs \(priceStr) per nut (-\(changeStr)%). The market is mostly stable — a reasonable time for both buyers and sellers to make a deal."
         default:
-            marketInsight = "Prices in \(zoneName) are stable this week. Market conditions are balanced between supply and demand."
+            marketInsight = "Prices in \(zoneName) are stable this week at Rs \(priceStr) per nut. Supply and demand are balanced — a fair time to buy or sell."
         }
     }
 
