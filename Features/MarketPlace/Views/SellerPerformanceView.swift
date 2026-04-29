@@ -8,10 +8,9 @@ struct SellerPerformanceView: View {
         ScrollView {
             VStack(spacing: 24) {
 
+                // MARK: - Timeframe Picker
                 Picker("Timeframe", selection: $viewModel.selectedTimeframe) {
-                    ForEach(viewModel.timeframes, id: \.self) { frame in
-                        Text(frame).tag(frame)
-                    }
+                    ForEach(viewModel.timeframes, id: \.self) { Text($0).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -19,7 +18,14 @@ struct SellerPerformanceView: View {
                     viewModel.onTimeframeChanged()
                 }
 
-               
+                // MARK: - Period Label
+                Text(periodDescription(for: viewModel.selectedTimeframe))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal)
+
+                // MARK: - KPI Cards
                 VStack(spacing: 16) {
                     HStack {
                         SellerKPICard(
@@ -31,25 +37,23 @@ struct SellerPerformanceView: View {
                         )
                         SellerKPICard(
                             title: "Pitch Success",
-                            value: "\(viewModel.pitchSuccessRate)%",
+                            value: viewModel.pitchSuccessRate > 0 ? "\(viewModel.pitchSuccessRate)%" : "—",
                             subtitle: "Offers Accepted",
                             icon: "hand.raised.fill",
                             color: .orange
                         )
                     }
 
-                  
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Gross Revenue (\(viewModel.selectedTimeframe))")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         if viewModel.isLoading {
-                            ProgressView()
-                                .padding(.vertical, 8)
+                            ProgressView().padding(.vertical, 8)
                         } else {
-                            Text("Rs \(viewModel.totalRevenue, specifier: "%.0f")")
+                            Text(viewModel.totalRevenue > 0 ? "Rs \(viewModel.totalRevenue, specifier: "%.0f")" : "Rs 0")
                                 .font(.system(size: 36, weight: .heavy, design: .rounded))
-                                .foregroundColor(.primary)
+                                .foregroundColor(viewModel.totalRevenue > 0 ? .primary : .secondary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -59,14 +63,13 @@ struct SellerPerformanceView: View {
                 }
                 .padding(.horizontal)
 
-              
+                // MARK: - Revenue Chart
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         Text("Detailed Revenue")
                             .font(.title3.bold())
                         Spacer()
-                       
-                        HStack(spacing: 8) {
+                        HStack(spacing: 12) {
                             HStack(spacing: 4) {
                                 Circle().fill(Color.green).frame(width: 8, height: 8)
                                 Text("Auctions").font(.caption).foregroundColor(.secondary)
@@ -81,22 +84,25 @@ struct SellerPerformanceView: View {
 
                     if viewModel.isLoading {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
+                            .frame(maxWidth: .infinity).frame(height: 250)
                             .padding()
                             .background(Color(UIColor.secondarySystemGroupedBackground))
                             .cornerRadius(16)
                             .padding(.horizontal)
-                    } else if viewModel.detailedRevenueData.isEmpty {
-                        Text("No revenue data for this period.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
-                            .padding()
-                            .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(16)
-                            .padding(.horizontal)
+                    } else if viewModel.hasNoRevenueData {
+                        VStack(spacing: 8) {
+                            Image(systemName: "chart.bar")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                            Text("No revenue data for this period.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 250)
+                        .padding()
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
                     } else {
                         Chart(viewModel.detailedRevenueData) { data in
                             BarMark(
@@ -118,7 +124,7 @@ struct SellerPerformanceView: View {
                     }
                 }
 
-            
+                // MARK: - Seller Insights
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Seller Insights")
                         .font(.title3.bold())
@@ -127,7 +133,7 @@ struct SellerPerformanceView: View {
                     VStack(spacing: 12) {
                         SellerInsightRow(icon: "arrow.up.right.circle.fill", color: .green,  title: "Premium Pricing",  desc: viewModel.insightPremiumDesc)
                         SellerInsightRow(icon: "chart.pie.fill",              color: .blue,   title: "Pitch Dependency", desc: viewModel.insightPitchDesc)
-                        SellerInsightRow(icon: "clock.fill",                  color: .orange, title: "Escrow Delays",    desc: viewModel.insightEscrowDesc)
+                        SellerInsightRow(icon: "clock.fill",                  color: .orange, title: "Escrow Turnaround", desc: viewModel.insightEscrowDesc)
                     }
                     .padding(.horizontal)
                 }
@@ -138,8 +144,28 @@ struct SellerPerformanceView: View {
         .navigationTitle("My Performance")
         .navigationBarTitleDisplayMode(.inline)
     }
-}
 
+    private func periodDescription(for timeframe: String) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy"
+
+        switch timeframe {
+        case "Week":
+            let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
+            return "\(formatter.string(from: start)) – \(formatter.string(from: now))"
+        case "Year":
+            let start = calendar.date(byAdding: .month, value: -11,
+                to: calendar.date(from: calendar.dateComponents([.year, .month], from: now))!) ?? now
+            return "\(formatter.string(from: start)) – \(formatter.string(from: now))"
+        default:
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMMM yyyy"
+            return monthFormatter.string(from: now)
+        }
+    }
+}
 
 struct SellerKPICard: View {
     let title: String
@@ -158,16 +184,10 @@ struct SellerKPICard: View {
                     .clipShape(Circle())
                 Spacer()
             }
-
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(value)
-                    .font(.title2.bold())
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                Text(title).font(.caption).foregroundColor(.secondary)
+                Text(value).font(.title2.bold())
+                Text(subtitle).font(.caption2).foregroundColor(.secondary)
             }
         }
         .padding()
@@ -185,13 +205,9 @@ struct SellerInsightRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-
+            Image(systemName: icon).font(.title2).foregroundColor(color)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.bold())
+                Text(title).font(.subheadline.bold())
                 Text(desc)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -206,7 +222,5 @@ struct SellerInsightRow: View {
 }
 
 #Preview {
-    NavigationStack {
-        SellerPerformanceView()
-    }
+    NavigationStack { SellerPerformanceView() }
 }

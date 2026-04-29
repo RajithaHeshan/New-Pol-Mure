@@ -1,5 +1,3 @@
-// Location: New-Pol-Mure/Features/MarketPlace/ViewModels/BuyerPerformanceViewModel.swift
-
 import SwiftUI
 import FirebaseFirestore
 
@@ -9,6 +7,14 @@ private final class BuyerPerformanceListenerBox {
     deinit { listener?.remove() }
 }
 
+private let buyerPerfDayFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "EEE"; return f
+}()
+
+private let buyerPerfMonthFormatter: DateFormatter = {
+    let f = DateFormatter(); f.dateFormat = "MMM"; return f
+}()
+
 @Observable
 @MainActor
 class BuyerPerformanceViewModel {
@@ -17,21 +23,25 @@ class BuyerPerformanceViewModel {
     var selectedTimeframe = "Month"
     let timeframes = ["Week", "Month", "Year"]
 
-    // MARK: - KPI Values
+    // MARK: - KPI Values (all timeframe-filtered)
     var totalVolumeNuts: Int = 0
-    var winRate: Int         = 0  // percentage
+    var winRate: Int         = 0
 
-    // MARK: - Chart Data (computed on demand from raw transactions)
+    // MARK: - Chart Data
     var detailedSpendData: [DetailedSpendData] = []
 
-    // MARK: - Dynamic KPI
+    // MARK: - Dynamic KPI (computed from filtered chart data)
     var totalSpend: Double {
         detailedSpendData.reduce(0) { $0 + $1.amount }
     }
 
+    var hasNoSpendData: Bool {
+        detailedSpendData.allSatisfy { $0.amount == 0 }
+    }
+
     // MARK: - Dynamic Insights
-    var insightSourcingDesc: String   = "Analysing your acquisition cost…"
-    var insightBidSuccessDesc: String = "Analysing your bid win rate…"
+    var insightSourcingDesc: String      = "Analysing your acquisition cost…"
+    var insightBidSuccessDesc: String    = "Analysing your bid win rate…"
     var insightOfferRelianceDesc: String = "Analysing your spend mix…"
 
     // MARK: - Loading State
@@ -39,10 +49,10 @@ class BuyerPerformanceViewModel {
 
     private let currentBuyerID: String
 
-    // Raw fetched data — re-processed whenever selectedTimeframe changes
-    private var allTransactions: [Transaction] = [] {
-        didSet { recomputeChartData() }
-    }
+    // Raw fetched data — kept all-time; re-filtered on timeframe change
+    private var allTransactions: [Transaction] = []
+    private var allContracts:    [Contract]    = []
+    private var allBids:         [Bid]         = []
 
     private let transactionsListenerBox = BuyerPerformanceListenerBox()
     private let contractsListenerBox    = BuyerPerformanceListenerBox()
@@ -55,12 +65,21 @@ class BuyerPerformanceViewModel {
         attachBidsListener()
     }
 
-    // MARK: - Timeframe change triggers chart recompute
     func onTimeframeChanged() {
-        recomputeChartData()
+        recompute()
     }
 
-    // MARK: - Transactions Listener (drives spend chart + total)
+    // MARK: - Rolling window start for the selected timeframe
+    private func windowStart(calendar: Calendar, now: Date) -> Date {
+        switch selectedTimeframe {
+        case "Week":  return calendar.date(byAdding: .day,   value: -6,  to: calendar.startOfDay(for: now)) ?? now
+        case "Year":  return calendar.date(byAdding: .month, value: -11, to: calendar.date(from: calendar.dateComponents([.year, .month], from: now))!) ?? now
+        default:      return calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
+        }
+    }
+
+    // MARK: - Listeners
+
     private func attachTransactionsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoading = true
@@ -68,52 +87,43 @@ class BuyerPerformanceViewModel {
         transactionsListenerBox.listener = Firestore.firestore()
             .collection("transactions")
             .whereField("buyerID", isEqualTo: currentBuyerID)
-            .whereField("isCredit", isEqualTo: false)   // buyer payments = outgoing
+            .whereField("isCredit", isEqualTo: false)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
-
                 if let error {
-                    print("Buyer performance transactions listener error: \(error.localizedDescription)")
-                    self.isLoading = false
-                    return
+                    print("Buyer performance transactions error: \(error.localizedDescription)")
+                    self.isLoading = false; return
                 }
-
                 self.allTransactions = snapshot?.documents.compactMap {
                     Transaction(id: $0.documentID, data: $0.data())
                 } ?? []
-
+                self.recompute()
                 self.isLoading = false
             }
     }
 
-    // MARK: - Contracts Listener (drives Total Volume KPI)
     private func attachContractsListener() {
         guard !currentBuyerID.isEmpty else { return }
 
+        // Include both statuses: transactions are written at "qualityApproved",
+        // contract moves to "completed" only after seller confirms pickup.
         contractsListenerBox.listener = Firestore.firestore()
             .collection("contracts")
             .whereField("buyerID", isEqualTo: currentBuyerID)
-            .whereField("status", isEqualTo: "completed")
+            .whereField("status", in: ["qualityApproved", "completed"])
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
-
                 if let error {
-                    print("Buyer performance contracts listener error: \(error.localizedDescription)")
+                    print("Buyer performance contracts error: \(error.localizedDescription)")
                     return
                 }
-
-                let completed = snapshot?.documents.compactMap {
+                self.allContracts = snapshot?.documents.compactMap {
                     Contract(id: $0.documentID, data: $0.data())
                 } ?? []
-
-                // Volume = count of completed contracts (quantity not separately stored on contract)
-                self.totalVolumeNuts = completed.count
-
-                self.updateInsights(completedContracts: completed)
+                self.recompute()
             }
     }
 
-    // MARK: - Bids Listener (drives Win Rate KPI)
     private func attachBidsListener() {
         guard !currentBuyerID.isEmpty else { return }
 
@@ -122,96 +132,89 @@ class BuyerPerformanceViewModel {
             .whereField("bidderID", isEqualTo: currentBuyerID)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
-
                 if let error {
-                    print("Buyer performance bids listener error: \(error.localizedDescription)")
+                    print("Buyer performance bids error: \(error.localizedDescription)")
                     return
                 }
-
-                let allBids = snapshot?.documents.compactMap {
+                self.allBids = snapshot?.documents.compactMap {
                     Bid(id: $0.documentID, data: $0.data())
                 } ?? []
-
-                // Group bids by sellerID and check if this buyer holds the highest bid per seller
-                var highestPerSeller: [String: Double] = [:]
-                for bid in allBids {
-                    if (highestPerSeller[bid.sellerID] ?? 0) < bid.amount {
-                        highestPerSeller[bid.sellerID] = bid.amount
-                    }
-                }
-
-                // Win = buyer's bid equals the highest bid on that seller's lot
-                let myBidsBySeller: [String: Double] = allBids.reduce(into: [:]) { map, bid in
-                    if (map[bid.sellerID] ?? 0) < bid.amount {
-                        map[bid.sellerID] = bid.amount
-                    }
-                }
-
-                let totalLots = myBidsBySeller.count
-                let wonLots   = myBidsBySeller.filter { sellerID, myTop in
-                    highestPerSeller[sellerID] == myTop
-                }.count
-
-                self.winRate = totalLots > 0 ? Int((Double(wonLots) / Double(totalLots)) * 100) : 0
+                self.recompute()
             }
     }
 
-    // MARK: - Recompute chart data for the selected timeframe
-    private func recomputeChartData() {
+    // MARK: - Central recompute
+    private func recompute() {
         let calendar = Calendar.current
         let now      = Date()
+        let start    = windowStart(calendar: calendar, now: now)
 
+        let windowTransactions = allTransactions.filter { $0.completedAt >= start }
+        let windowContracts    = allContracts.filter    { $0.createdAt   >= start }
+        let windowBids         = allBids.filter         { $0.placedAt    >= start }
+
+        // Nuts acquired = sum of quantities from completed contracts in this window
+        totalVolumeNuts = windowContracts.reduce(0) { $0 + $1.quantity }
+
+        // Win rate: for each unique harvestID bid on in this window, check if buyer holds the highest bid
+        var highestBidPerHarvest: [String: Double] = [:]
+        for bid in allBids {
+            if (highestBidPerHarvest[bid.harvestID] ?? 0) < bid.amount {
+                highestBidPerHarvest[bid.harvestID] = bid.amount
+            }
+        }
+        let windowHarvestIDs = Set(windowBids.map { $0.harvestID })
+        let myTopBidPerHarvest: [String: Double] = windowBids.reduce(into: [:]) { map, bid in
+            if (map[bid.harvestID] ?? 0) < bid.amount {
+                map[bid.harvestID] = bid.amount
+            }
+        }
+        let totalLots = windowHarvestIDs.count
+        let wonLots   = myTopBidPerHarvest.filter { harvestID, myTop in
+            highestBidPerHarvest[harvestID] == myTop
+        }.count
+        winRate = totalLots > 0 ? Int((Double(wonLots) / Double(totalLots)) * 100) : 0
+
+        recomputeChartData(transactions: windowTransactions, calendar: calendar, now: now)
+        updateInsights(windowContracts: windowContracts)
+    }
+
+    // MARK: - Chart bucket grouping
+    private func recomputeChartData(transactions: [Transaction], calendar: Calendar, now: Date) {
         var bidsBuckets:   [String: Double] = [:]
         var offersBuckets: [String: Double] = [:]
 
-        for tx in allTransactions {
-            let periodKey = periodLabel(for: tx.completedAt, calendar: calendar, now: now)
-            guard !periodKey.isEmpty else { continue }
-
+        for tx in transactions {
+            let key = periodLabel(for: tx.completedAt, calendar: calendar, now: now)
             if tx.source == "offer" {
-                offersBuckets[periodKey, default: 0] += tx.amount
+                offersBuckets[key, default: 0] += tx.amount
             } else {
-                bidsBuckets[periodKey, default: 0] += tx.amount
+                bidsBuckets[key, default: 0] += tx.amount
             }
         }
 
-        let orderedPeriods = orderedPeriodLabels(calendar: calendar, now: now)
-
+        let periods = orderedPeriodLabels(calendar: calendar, now: now)
         var result: [DetailedSpendData] = []
-        for period in orderedPeriods {
+        for period in periods {
+            // Always include every period so the x-axis shows all days/months, not just ones with data
             let bidsAmt   = bidsBuckets[period]   ?? 0
             let offersAmt = offersBuckets[period] ?? 0
-            if bidsAmt > 0 {
-                result.append(DetailedSpendData(id: "\(period)-Bids", period: period, amount: bidsAmt, source: "Bids Won"))
-            }
-            if offersAmt > 0 {
-                result.append(DetailedSpendData(id: "\(period)-Offers", period: period, amount: offersAmt, source: "Accepted Offers"))
-            }
+            result.append(DetailedSpendData(id: "\(period)-Bids",   period: period, amount: bidsAmt,   source: "Bids Won"))
+            result.append(DetailedSpendData(id: "\(period)-Offers", period: period, amount: offersAmt, source: "Accepted Offers"))
         }
-
         detailedSpendData = result
     }
 
-    // MARK: - Period label for a transaction date given the selected timeframe
+    // MARK: - Period label for a single transaction date
     private func periodLabel(for date: Date, calendar: Calendar, now: Date) -> String {
         switch selectedTimeframe {
         case "Week":
-            let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
-            guard date >= startOfWeek else { return "" }
-            let dayFormatter = DateFormatter()
-            dayFormatter.dateFormat = "EEE"
-            return dayFormatter.string(from: date)
+            return buyerPerfDayFormatter.string(from: date)
 
         case "Year":
-            let startOfYear = calendar.dateInterval(of: .year, for: now)?.start ?? now
-            guard date >= startOfYear else { return "" }
-            let monthFormatter = DateFormatter()
-            monthFormatter.dateFormat = "MMM"
-            return monthFormatter.string(from: date)
+            return buyerPerfMonthFormatter.string(from: date)
 
-        default: // "Month"
-            let startOfMonth = calendar.dateInterval(of: .month, for: now)?.start ?? now
-            guard date >= startOfMonth else { return "" }
+        default:
             let dayOfMonth = calendar.component(.day, from: date)
             switch dayOfMonth {
             case 1...7:   return "Week 1"
@@ -222,56 +225,55 @@ class BuyerPerformanceViewModel {
         }
     }
 
-    // MARK: - Ordered period label list for the chart x-axis
+    // MARK: - Ordered x-axis labels
     private func orderedPeriodLabels(calendar: Calendar, now: Date) -> [String] {
         switch selectedTimeframe {
         case "Week":
-            return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        case "Year":
-            let monthFormatter = DateFormatter()
-            monthFormatter.dateFormat = "MMM"
-            return (0..<12).compactMap {
-                calendar.date(byAdding: .month, value: -11 + $0, to: now).map { monthFormatter.string(from: $0) }
+            return (0..<7).compactMap { offset in
+                calendar.date(byAdding: .day, value: -(6 - offset), to: calendar.startOfDay(for: now))
+                    .map { buyerPerfDayFormatter.string(from: $0) }
             }
+
+        case "Year":
+            return (0..<12).compactMap { offset in
+                calendar.date(byAdding: .month, value: -(11 - offset), to: now)
+                    .map { buyerPerfMonthFormatter.string(from: $0) }
+            }
+
         default:
             return ["Week 1", "Week 2", "Week 3", "Week 4"]
         }
     }
 
-    // MARK: - Dynamic Insight Text
-    private func updateInsights(completedContracts: [Contract]) {
-        // Offer reliance = offers spend / total spend
-        let offersSpend  = detailedSpendData.filter { $0.source == "Accepted Offers" }.reduce(0) { $0 + $1.amount }
-        let offerPct     = totalSpend > 0 ? Int((offersSpend / totalSpend) * 100) : 0
+    // MARK: - Dynamic Insights
+    private func updateInsights(windowContracts: [Contract]) {
+        let offersSpend = detailedSpendData.filter { $0.source == "Accepted Offers" }.reduce(0) { $0 + $1.amount }
+        let offerPct    = totalSpend > 0 ? Int((offersSpend / totalSpend) * 100) : 0
 
         insightOfferRelianceDesc = offerPct > 0
-            ? "You acquire \(offerPct)% of your volume from direct offers. Try more auctions for competitive pricing."
-            : "No offer spend recorded yet. Accept a seller's pitch to diversify your sourcing mix."
+            ? "You sourced \(offerPct)% of your spend this period from direct offers. Try more auctions for competitive pricing."
+            : "No offer spend this period. Accept a seller's pitch to diversify your sourcing."
 
-        // Sourcing cost — compare buyer's avg contract amount vs a market baseline (Rs 105 per nut)
         let marketBaseline: Double = 105.0
-        let avgAmount = completedContracts.isEmpty ? 0 : completedContracts.reduce(0) { $0 + $1.amount } / Double(completedContracts.count)
-        if avgAmount > 0 {
-            let diffPct = ((avgAmount - marketBaseline) / marketBaseline) * 100
-            if diffPct < 0 {
-                insightSourcingDesc = "Your average acquisition cost is \(String(format: "%.1f", abs(diffPct)))% below market average. Excellent sourcing."
-            } else {
-                insightSourcingDesc = "Your average acquisition cost is \(String(format: "%.1f", diffPct))% above market average. Consider bidding on more auctions."
-            }
+        if !windowContracts.isEmpty {
+            let avgAmount = windowContracts.reduce(0.0) { $0 + $1.amount } / Double(windowContracts.count)
+            let diffPct   = ((avgAmount - marketBaseline) / marketBaseline) * 100
+            insightSourcingDesc = diffPct <= 0
+                ? "Your average cost is \(String(format: "%.1f", abs(diffPct)))% below the market average (Rs \(Int(marketBaseline)) per nut). Great sourcing."
+                : "Your average cost is \(String(format: "%.1f", diffPct))% above market this period. Bid on more auctions for better deals."
         } else {
-            insightSourcingDesc = "No completed contracts yet. Complete your first purchase to see sourcing insights."
+            insightSourcingDesc = "No completed contracts this period. Finish a purchase to see sourcing insights."
         }
 
-        // Bid success feedback
         switch winRate {
         case 0:
-            insightBidSuccessDesc = "No bids placed yet. Start bidding on active harvest lots to see your win rate."
+            insightBidSuccessDesc = "No bids placed this period. Start bidding on active harvest lots to see your win rate."
         case 1...40:
-            insightBidSuccessDesc = "Your bid win rate is \(winRate)%. Consider increasing offers by Rs 2–5 to stay competitive."
+            insightBidSuccessDesc = "Your win rate is \(winRate)% this period. Try raising your bids by Rs 2–5 to stay ahead."
         case 41...70:
-            insightBidSuccessDesc = "Your bid win rate is \(winRate)%. Solid performance — keep monitoring active lots for opportunities."
+            insightBidSuccessDesc = "Your win rate is \(winRate)% this period. Good — keep an eye on active lots for more opportunities."
         default:
-            insightBidSuccessDesc = "Your bid win rate is \(winRate)%. Excellent — you are consistently outbidding the competition."
+            insightBidSuccessDesc = "Your win rate is \(winRate)% this period. Excellent — you are consistently outbidding the competition."
         }
     }
 }

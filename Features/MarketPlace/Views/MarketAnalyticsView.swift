@@ -12,7 +12,7 @@ struct MarketAnalyticsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
 
-                // MARK: - Zone Picker
+               
                 zonePicker
 
             
@@ -41,7 +41,7 @@ struct MarketAnalyticsView: View {
                 }
                 .padding(.horizontal)
 
-                // MARK: - 7-Day Price Trend Chart
+              
                 VStack(alignment: .leading) {
                     Text("7-Day Price Trend (\(viewModel.selectedZone.displayName))")
                         .font(.headline)
@@ -112,7 +112,7 @@ struct MarketAnalyticsView: View {
                 .cornerRadius(12)
                 .padding(.horizontal)
 
-                // MARK: - Zone Coverage Info
+               
                 if viewModel.selectedZone.id != "all" {
                     HStack(spacing: 8) {
                         Image(systemName: "location.circle.fill")
@@ -132,8 +132,7 @@ struct MarketAnalyticsView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    // MARK: - Zone Picker Chips
-    private var zonePicker: some View {
+        private var zonePicker: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(viewModel.zones) { zone in

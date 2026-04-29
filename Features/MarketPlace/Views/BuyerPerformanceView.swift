@@ -1,5 +1,3 @@
-
-
 import SwiftUI
 import Charts
 
@@ -10,11 +8,9 @@ struct BuyerPerformanceView: View {
         ScrollView {
             VStack(spacing: 24) {
 
-                // 1. Timeframe Selector
+                // MARK: - Timeframe Picker
                 Picker("Timeframe", selection: $viewModel.selectedTimeframe) {
-                    ForEach(viewModel.timeframes, id: \.self) { frame in
-                        Text(frame).tag(frame)
-                    }
+                    ForEach(viewModel.timeframes, id: \.self) { Text($0).tag($0) }
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal)
@@ -22,7 +18,14 @@ struct BuyerPerformanceView: View {
                     viewModel.onTimeframeChanged()
                 }
 
-                // 2. High-Level KPI Summary
+                // MARK: - Period Label
+                Text(periodDescription(for: viewModel.selectedTimeframe))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal)
+
+                // MARK: - KPI Cards
                 VStack(spacing: 16) {
                     HStack {
                         BuyerKPICard(
@@ -34,25 +37,23 @@ struct BuyerPerformanceView: View {
                         )
                         BuyerKPICard(
                             title: "Win Rate",
-                            value: "\(viewModel.winRate)%",
+                            value: viewModel.winRate > 0 ? "\(viewModel.winRate)%" : "—",
                             subtitle: "Bids Won",
                             icon: "trophy.fill",
                             color: .green
                         )
                     }
 
-                    // Large Spend Card
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Total Spend (\(viewModel.selectedTimeframe))")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         if viewModel.isLoading {
-                            ProgressView()
-                                .padding(.vertical, 8)
+                            ProgressView().padding(.vertical, 8)
                         } else {
-                            Text("Rs \(viewModel.totalSpend, specifier: "%.0f")")
+                            Text(viewModel.totalSpend > 0 ? "Rs \(viewModel.totalSpend, specifier: "%.0f")" : "Rs 0")
                                 .font(.system(size: 36, weight: .heavy, design: .rounded))
-                                .foregroundColor(.primary)
+                                .foregroundColor(viewModel.totalSpend > 0 ? .primary : .secondary)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,14 +63,13 @@ struct BuyerPerformanceView: View {
                 }
                 .padding(.horizontal)
 
-               
+                // MARK: - Spend Chart
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         Text("Detailed Expenditure")
                             .font(.title3.bold())
                         Spacer()
-                       
-                        HStack(spacing: 8) {
+                        HStack(spacing: 12) {
                             HStack(spacing: 4) {
                                 Circle().fill(Color.blue).frame(width: 8, height: 8)
                                 Text("Bids").font(.caption).foregroundColor(.secondary)
@@ -84,22 +84,25 @@ struct BuyerPerformanceView: View {
 
                     if viewModel.isLoading {
                         ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
+                            .frame(maxWidth: .infinity).frame(height: 250)
                             .padding()
                             .background(Color(UIColor.secondarySystemGroupedBackground))
                             .cornerRadius(16)
                             .padding(.horizontal)
-                    } else if viewModel.detailedSpendData.isEmpty {
-                        Text("No spend data for this period.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 250)
-                            .padding()
-                            .background(Color(UIColor.secondarySystemGroupedBackground))
-                            .cornerRadius(16)
-                            .padding(.horizontal)
+                    } else if viewModel.hasNoSpendData {
+                        VStack(spacing: 8) {
+                            Image(systemName: "chart.bar")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                            Text("No spend data for this period.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 250)
+                        .padding()
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
                     } else {
                         Chart(viewModel.detailedSpendData) { data in
                             BarMark(
@@ -121,16 +124,16 @@ struct BuyerPerformanceView: View {
                     }
                 }
 
-                // 4. Personal Insights
+                // MARK: - Personal Insights
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Personal Insights")
                         .font(.title3.bold())
                         .padding(.horizontal)
 
                     VStack(spacing: 12) {
-                        BuyerInsightRow(icon: "arrow.down.right.circle.fill", color: .green,  title: "Great Sourcing",   desc: viewModel.insightSourcingDesc)
-                        BuyerInsightRow(icon: "exclamationmark.triangle.fill", color: .orange, title: "Bid Success",      desc: viewModel.insightBidSuccessDesc)
-                        BuyerInsightRow(icon: "lightbulb.fill",                color: .yellow, title: "Offer Reliance",   desc: viewModel.insightOfferRelianceDesc)
+                        BuyerInsightRow(icon: "arrow.down.right.circle.fill", color: .green,  title: "Sourcing Cost",   desc: viewModel.insightSourcingDesc)
+                        BuyerInsightRow(icon: "exclamationmark.triangle.fill", color: .orange, title: "Bid Success",     desc: viewModel.insightBidSuccessDesc)
+                        BuyerInsightRow(icon: "lightbulb.fill",                color: .yellow, title: "Offer Reliance",  desc: viewModel.insightOfferRelianceDesc)
                     }
                     .padding(.horizontal)
                 }
@@ -141,9 +144,28 @@ struct BuyerPerformanceView: View {
         .navigationTitle("My Performance")
         .navigationBarTitleDisplayMode(.inline)
     }
-}
 
-// MARK: - Reusable Analytics Subviews
+    private func periodDescription(for timeframe: String) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy"
+
+        switch timeframe {
+        case "Week":
+            let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
+            return "\(formatter.string(from: start)) – \(formatter.string(from: now))"
+        case "Year":
+            let start = calendar.date(byAdding: .month, value: -11,
+                to: calendar.date(from: calendar.dateComponents([.year, .month], from: now))!) ?? now
+            return "\(formatter.string(from: start)) – \(formatter.string(from: now))"
+        default:
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMMM yyyy"
+            return monthFormatter.string(from: now)
+        }
+    }
+}
 
 struct BuyerKPICard: View {
     let title: String
@@ -162,16 +184,10 @@ struct BuyerKPICard: View {
                     .clipShape(Circle())
                 Spacer()
             }
-
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Text(value)
-                    .font(.title2.bold())
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                Text(title).font(.caption).foregroundColor(.secondary)
+                Text(value).font(.title2.bold())
+                Text(subtitle).font(.caption2).foregroundColor(.secondary)
             }
         }
         .padding()
@@ -189,13 +205,9 @@ struct BuyerInsightRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(color)
-
+            Image(systemName: icon).font(.title2).foregroundColor(color)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.bold())
+                Text(title).font(.subheadline.bold())
                 Text(desc)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -210,7 +222,5 @@ struct BuyerInsightRow: View {
 }
 
 #Preview {
-    NavigationStack {
-        BuyerPerformanceView()
-    }
+    NavigationStack { BuyerPerformanceView() }
 }
