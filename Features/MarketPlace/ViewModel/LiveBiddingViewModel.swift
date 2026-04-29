@@ -111,7 +111,7 @@ class LiveBiddingViewModel {
         Task {
             do {
                 let bidData: [String: Any] = [
-                    "harvestID":  lot.id,        // harvest doc ID — for real-time listener in this view
+                    "harvestID":  lot.id,      
                     "sellerID":   lot.sellerID,  // seller's user ID — for SellerActivityDashboard
                     "bidderID":   currentBuyerID,
                     "bidderName": currentBuyerName,
