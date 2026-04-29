@@ -24,8 +24,13 @@ struct LiveBiddingView: View {
 
                     Divider()
 
-                    // MARK: - Navigation to Market Analytics
-                    NavigationLink(destination: MarketAnalyticsView()) {
+                    // MARK: - Navigation to Market Analytics (pre-selects zone matching this lot's location)
+                    NavigationLink(destination: MarketAnalyticsView(
+                        preselectedZone: CoconutZone.zone(
+                            for: viewModel.lot.coordinate.latitude,
+                            lng: viewModel.lot.coordinate.longitude
+                        )
+                    )) {
                         HStack {
                             Image(systemName: "chart.xyaxis.line")
                             Text("Check Market Prices Before Bidding")

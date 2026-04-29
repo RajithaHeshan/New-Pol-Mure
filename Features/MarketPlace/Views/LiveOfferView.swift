@@ -19,7 +19,12 @@ struct LiveOfferView: View {
 
                     Divider()
 
-                    NavigationLink(destination: MarketAnalyticsView()) {
+                    NavigationLink(destination: MarketAnalyticsView(
+                        preselectedZone: CoconutZone.zone(
+                            for: viewModel.buyer.coordinate.latitude,
+                            lng: viewModel.buyer.coordinate.longitude
+                        )
+                    )) {
                         HStack {
                             Image(systemName: "chart.xyaxis.line")
                             Text("Check Market Prices Before Pitching")

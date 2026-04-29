@@ -1,5 +1,3 @@
-// Location: New-Pol-Mure/Features/MarketPlace/ViewModels/ActivityDashboardViewModel.swift
-
 import SwiftUI
 import FirebaseFirestore
 import UserNotifications
