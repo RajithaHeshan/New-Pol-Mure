@@ -400,7 +400,7 @@ class DiscoveryDashboardViewModel {
 
         switch selectedFilter {
         case "High Volume":
-            results = results.filter { (Int($0.typicalYield) ?? 0) >= 5000 }
+            results = results.filter { RecommendationEngine.parseVolume($0.typicalYield) >= 5000 }
         case "Ending Soon":
             results = results.filter { $0.nextHarvestDate.timeIntervalSinceNow < 604800 } // Within 7 days
         case "Nearest to Me":

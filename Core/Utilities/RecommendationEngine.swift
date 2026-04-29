@@ -7,13 +7,12 @@ final class RecommendationEngine {
 
     static let shared = RecommendationEngine()
 
-    private let model: MyTabularRegressor_for_cocount_recommendation_feature_1?
+    private let model: NewMyTabularRegressor_1?
 
     private init() {
-        model = try? MyTabularRegressor_for_cocount_recommendation_feature_1(configuration: MLModelConfiguration())
+        model = try? NewMyTabularRegressor_1(configuration: MLModelConfiguration())
     }
 
-    
     func scoreSellerForBuyer(
         buyerVolume: Int,
         sellerVolume: Int,
@@ -29,7 +28,7 @@ final class RecommendationEngine {
         let distanceKM = distance(from: buyerLocation, to: sellerLocation)
         let volumeCompatibility = volumeRatio(a: buyerVolume, b: sellerVolume)
 
-        let input = MyTabularRegressor_for_cocount_recommendation_feature_1Input(
+        let input = NewMyTabularRegressor_1Input(
             BuyerVolume: Int64(buyerVolume),
             SellerVolume: Int64(sellerVolume),
             VolumeCompatibility: volumeCompatibility,
@@ -68,7 +67,7 @@ final class RecommendationEngine {
         )
     }
 
-    // MARK: - Helpers
+   
 
     func distance(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
         let locA = CLLocation(latitude: a.latitude, longitude: a.longitude)

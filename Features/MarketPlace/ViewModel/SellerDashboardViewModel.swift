@@ -406,7 +406,7 @@ class SellerDashboardViewModel {
 
         switch selectedFilter {
         case "High Capacity":
-            results = results.filter { (Int($0.typicalVolume) ?? 0) >= 10000 }
+            results = results.filter { RecommendationEngine.parseVolume($0.typicalVolume) >= 10000 }
         case "Nearest to Me":
             results.sort { b1, b2 in
                 let loc1 = CLLocation(latitude: b1.coordinate.latitude, longitude: b1.coordinate.longitude)
