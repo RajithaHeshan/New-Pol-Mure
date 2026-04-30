@@ -299,10 +299,11 @@ class MarketAnalyticsViewModel {
         let thisWeekAvg = thisWeekTotals.values.reduce((0.0, 0)) { ($0.0 + $1.sum, $0.1 + $1.count) }
         let prevWeekAvg = prevWeekTotals.values.reduce((0.0, 0)) { ($0.0 + $1.sum, $0.1 + $1.count) }
 
-        let thisAvg = thisWeekAvg.1 > 0 ? thisWeekAvg.0 / Double(thisWeekAvg.1) : 0
         let prevAvg = prevWeekAvg.1 > 0 ? prevWeekAvg.0 / Double(prevWeekAvg.1) : 0
 
-        weeklyChangePercent        = prevAvg > 0 ? ((thisAvg - prevAvg) / prevAvg) * 100 : 0
+        // Use currentMarketAverage (most recent day's price) for the change calculation
+        // so the insight text matches what the user sees at the top of the chart
+        weeklyChangePercent        = prevAvg > 0 ? ((currentMarketAverage - prevAvg) / prevAvg) * 100 : 0
         prevWeekAverage            = prevAvg
         weeklyTransactionCount     = thisWeekAvg.1
 
