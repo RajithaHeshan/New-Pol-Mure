@@ -75,11 +75,16 @@ class MarketAnalyticsViewModel {
     var priceHistory: [PriceTrend] = []
 
     // MARK: - Summary Stats
-    var currentMarketAverage: Double = 0
-    var weeklyChangePercent: Double  = 0
+    var currentMarketAverage: Double  = 0
+    var weeklyChangePercent: Double   = 0
+    var prevWeekAverage: Double       = 0   // previous 7-day avg — fed into PriceForecastEngine
+    var weeklyTransactionCount: Int   = 0   // total bids+offers this week in selected zone
 
     // MARK: - Date Range Label  e.g. "24 Apr 2026 – 30 Apr 2026"
     var chartDateRange: String = ""
+
+    // MARK: - 7-Day Price Forecast (CoreML)
+    var priceForecast: PriceForecast? = nil
 
     // MARK: - Market Insight
     var marketInsight: String = "Analysing market trends…"
@@ -297,9 +302,12 @@ class MarketAnalyticsViewModel {
         let thisAvg = thisWeekAvg.1 > 0 ? thisWeekAvg.0 / Double(thisWeekAvg.1) : 0
         let prevAvg = prevWeekAvg.1 > 0 ? prevWeekAvg.0 / Double(prevWeekAvg.1) : 0
 
-        weeklyChangePercent = prevAvg > 0 ? ((thisAvg - prevAvg) / prevAvg) * 100 : 0
+        weeklyChangePercent        = prevAvg > 0 ? ((thisAvg - prevAvg) / prevAvg) * 100 : 0
+        prevWeekAverage            = prevAvg
+        weeklyTransactionCount     = thisWeekAvg.1
 
         updateInsight()
+        updateForecast()
     }
 
     // MARK: - Dynamic Insight
@@ -331,6 +339,21 @@ class MarketAnalyticsViewModel {
         }
     }
 
+    // MARK: - CoreML Forecast
+    private func updateForecast() {
+        guard !hasNoData else {
+            priceForecast = nil
+            return
+        }
+        priceForecast = PriceForecastEngine.shared.predict(
+            zoneID:                  selectedZone.id == "all" ? "kurunegala" : selectedZone.id,
+            weeklyAvgPrice:          currentMarketAverage,
+            prevWeekAvgPrice:        prevWeekAverage,
+            weeklyChangePct:         weeklyChangePercent,
+            weeklyTransactionCount:  weeklyTransactionCount
+        )
+    }
+
     // MARK: - Formatted Helpers
     var hasNoData: Bool {
         priceHistory.allSatisfy { $0.price == 0 }
@@ -357,4 +380,12 @@ class MarketAnalyticsViewModel {
     }
 
     var weeklyChangeIsPositive: Bool { weeklyChangePercent >= 0 }
+
+    // Forecast window label — "1 May 2026 – 7 May 2026"
+    var forecastDateRange: String {
+        let calendar = Calendar.current
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        let endDay   = calendar.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        return "\(fullDateFormatter.string(from: tomorrow)) – \(fullDateFormatter.string(from: endDay))"
+    }
 }

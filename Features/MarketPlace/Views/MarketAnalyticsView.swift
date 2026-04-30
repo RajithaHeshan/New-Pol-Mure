@@ -120,7 +120,55 @@ struct MarketAnalyticsView: View {
                 .cornerRadius(12)
                 .padding(.horizontal)
 
-               
+                // MARK: - 7-Day AI Price Forecast Card
+                if let forecast = viewModel.priceForecast {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "cpu.fill")
+                                .foregroundColor(.purple)
+                            Text("AI Price Forecast")
+                                .font(.headline)
+                        }
+
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("Rs \(forecast.predictedPrice, specifier: "%.2f")")
+                                .font(.system(size: 36, weight: .heavy, design: .rounded))
+                                .foregroundColor(.purple)
+                            Text("per nut")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "calendar.badge.clock")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                            Text("Predicted price in 7 days")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if !viewModel.forecastDateRange.isEmpty {
+                            HStack(spacing: 6) {
+                                Image(systemName: "calendar")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                                Text(viewModel.forecastDateRange)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.purple.opacity(0.07))
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .strokeBorder(Color.purple.opacity(0.25), lineWidth: 1)
+                    )
+                    .padding(.horizontal)
+                }
+
                 if viewModel.selectedZone.id != "all" {
                     HStack(spacing: 8) {
                         Image(systemName: "location.circle.fill")
