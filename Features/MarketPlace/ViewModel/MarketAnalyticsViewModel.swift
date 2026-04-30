@@ -43,6 +43,20 @@ private let dayFormatter: DateFormatter = {
     return f
 }()
 
+// "24 Apr" — shown on chart x-axis tick
+private let chartTickFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "d MMM"
+    return f
+}()
+
+// "24 Apr 2026" — shown in the date range label
+private let fullDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "d MMM yyyy"
+    return f
+}()
+
 private final class AnalyticsListenerBox {
     var listener: ListenerRegistration?
     init() {}
@@ -63,6 +77,9 @@ class MarketAnalyticsViewModel {
     // MARK: - Summary Stats
     var currentMarketAverage: Double = 0
     var weeklyChangePercent: Double  = 0
+
+    // MARK: - Date Range Label  e.g. "24 Apr 2026 – 30 Apr 2026"
+    var chartDateRange: String = ""
 
     // MARK: - Market Insight
     var marketInsight: String = "Analysing market trends…"
@@ -247,17 +264,23 @@ class MarketAnalyticsViewModel {
         var trends: [PriceTrend] = []
         for offset in stride(from: 6, through: 0, by: -1) {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else { continue }
-            let label = dayFormatter.string(from: date)
+            let dayLabel  = dayFormatter.string(from: date)       // "Thu"
+            let tickLabel = chartTickFormatter.string(from: date)  // "24 Apr"
             let avg: Double
             if let entry = thisWeekTotals[offset], entry.count > 0 {
                 avg = entry.sum / Double(entry.count)
             } else {
                 avg = trends.last?.price ?? 0
             }
-            trends.append(PriceTrend(id: label, day: label, price: avg))
+            trends.append(PriceTrend(id: tickLabel, day: dayLabel, date: date, price: avg))
         }
 
         priceHistory = trends
+
+        // Date range label — "24 Apr 2026 – 30 Apr 2026"
+        if let first = trends.first?.date, let last = trends.last?.date {
+            chartDateRange = "\(fullDateFormatter.string(from: first)) – \(fullDateFormatter.string(from: last))"
+        }
 
         // Use today's average (offset 0) if it has bids, otherwise fall back to most recent day with data
         if let todayEntry = thisWeekTotals[0], todayEntry.count > 0 {

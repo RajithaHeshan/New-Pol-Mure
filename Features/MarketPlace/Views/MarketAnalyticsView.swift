@@ -45,7 +45,15 @@ struct MarketAnalyticsView: View {
                 VStack(alignment: .leading) {
                     Text("7-Day Price Trend (\(viewModel.selectedZone.displayName))")
                         .font(.headline)
-                        .padding(.bottom, 10)
+
+                    // Dynamic date range — updates every time zone or data changes
+                    if !viewModel.chartDateRange.isEmpty {
+                        Text(viewModel.chartDateRange)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer().frame(height: 10)
 
                     if viewModel.isLoading {
                         ProgressView()
@@ -67,7 +75,7 @@ struct MarketAnalyticsView: View {
                         Chart {
                             ForEach(viewModel.priceHistory) { item in
                                 LineMark(
-                                    x: .value("Day", item.day),
+                                    x: .value("Date", item.id),   // "24 Apr" — actual date on x-axis
                                     y: .value("Price", item.price)
                                 )
                                 .interpolationMethod(.catmullRom)
@@ -75,7 +83,7 @@ struct MarketAnalyticsView: View {
                                 .lineStyle(StrokeStyle(lineWidth: 3))
 
                                 AreaMark(
-                                    x: .value("Day", item.day),
+                                    x: .value("Date", item.id),
                                     y: .value("Price", item.price)
                                 )
                                 .interpolationMethod(.catmullRom)
