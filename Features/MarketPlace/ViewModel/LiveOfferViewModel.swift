@@ -24,6 +24,7 @@ class LiveOfferViewModel {
     private let currentSellerID: String
     private var currentSellerName: String = ""
     private let listenerBox = OfferListenerBox()
+    private var hasLoadedOnce: Bool = false
 
     init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0, isUrgentPitch: Bool = false) {
         self.buyer = buyer
@@ -73,17 +74,20 @@ class LiveOfferViewModel {
 
                 if lowestOffer.sellerID == self.currentSellerID {
                     self.isUndercut = false
+                    self.hasLoadedOnce = true
                     return
                 }
 
                 let thisSellerHasOffer = allOffers.contains { $0.sellerID == self.currentSellerID }
-                if thisSellerHasOffer && lowestOffer.sellerID != previousLeaderID && !self.isUndercut {
+                // Only fire notification for genuine NEW undercut events — not on first load
+                if self.hasLoadedOnce && thisSellerHasOffer && lowestOffer.sellerID != previousLeaderID && !self.isUndercut {
                     self.isUndercut = true
                     self.scheduleUndercutNotification(
                         newAmount: lowestOffer.amount,
                         sellerName: lowestOffer.sellerName
                     )
                 }
+                self.hasLoadedOnce = true
             }
     }
 
