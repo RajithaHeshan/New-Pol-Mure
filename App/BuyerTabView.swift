@@ -43,7 +43,11 @@ struct BuyerTabView: View {
         }
         // React when Siri fires a navigation command
         .onChange(of: navState.buyerSelectedTab) { _, newTab in
+            guard newTab >= 0 else { return }
             selectedTab = newTab
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                navState.buyerSelectedTab = -1
+            }
         }
         .onChange(of: navState.requestedZone) { _, zoneID in
             guard let zoneID else { return }
