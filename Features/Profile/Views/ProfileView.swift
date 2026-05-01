@@ -42,7 +42,7 @@ struct ProfileView: View {
         .onAppear { viewModel.load() }
     }
 
-    // MARK: - Loading
+   
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
@@ -53,7 +53,7 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Form
+   
     private var formView: some View {
         Form {
             profileHeaderSection
@@ -69,7 +69,7 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Profile Header
+   
     private var profileHeaderSection: some View {
         Section {
             HStack {

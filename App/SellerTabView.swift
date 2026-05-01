@@ -3,7 +3,11 @@
 import SwiftUI
 
 struct SellerTabView: View {
+    @Environment(AppNavigationState.self) private var navState
     @State private var selectedTab = 0
+    @State private var analyticsZone: CoconutZone? = nil
+    @State private var showPerformance = false
+    @State private var showAccount = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -21,11 +25,42 @@ struct SellerTabView: View {
                 .tabItem { Label("New Harvest", systemImage: selectedTab == 2 ? "plus.app.fill" : "plus.app") }
                 .tag(2)
 
-            MarketAnalyticsView()
+            MarketAnalyticsView(preselectedZone: analyticsZone)
                 .tabItem { Label("Analytics", systemImage: selectedTab == 3 ? "chart.xyaxis.line" : "chart.xyaxis.line") }
                 .tag(3)
         }
         .tint(.green)
+        .sheet(isPresented: $showPerformance) {
+            NavigationStack { SellerPerformanceView() }
+        }
+        .sheet(isPresented: $showAccount) {
+            NavigationStack { ProfileView() }
+        }
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                SiriActivityManager.shared.donateAll()
+            }
+        }
+        // React when Siri fires a navigation command
+        .onChange(of: navState.sellerSelectedTab) { _, newTab in
+            selectedTab = newTab
+        }
+        .onChange(of: navState.requestedZone) { _, zoneID in
+            guard let zoneID else { return }
+            analyticsZone = CoconutZone.allZones.first { $0.id == zoneID }
+            selectedTab = 3
+            navState.requestedZone = nil
+        }
+        .onChange(of: navState.showPerformance) { _, show in
+            guard show else { return }
+            showPerformance = true
+            navState.showPerformance = false
+        }
+        .onChange(of: navState.showAccount) { _, show in
+            guard show else { return }
+            showAccount = true
+            navState.showAccount = false
+        }
     }
 }
 

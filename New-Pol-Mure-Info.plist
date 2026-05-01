@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>OpenActivityIntentIntent</string>
+		<string>OpenNewHarvestIntentIntent</string>
+		<string>OpenPerformanceIntentIntent</string>
+		<string>OpenUrgentIntentIntent</string>
+		<string>com.newpolmure.checkprice</string>
+		<string>com.newpolmure.openaccount</string>
+		<string>com.newpolmure.openactivity</string>
+		<string>com.newpolmure.opennewharvest</string>
+		<string>com.newpolmure.openperformance</string>
+		<string>com.newpolmure.openurgent</string>
+	</array>
+</dict>
+</plist>

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		3950B5DA2FA0DA32006B8576 /* NewMyTabularRegressor 1.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 3950B5D92FA0DA32006B8576 /* NewMyTabularRegressor 1.mlmodel */; };
 		3950B5DC2FA337E1006B8576 /* CoconutPriceForecaster 1.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 3950B5DB2FA337E1006B8576 /* CoconutPriceForecaster 1.mlmodel */; };
+		3950B5EC2FA36D86006B8576 /* New-Pol-Mure-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3950B5EB2FA36D86006B8576 /* New-Pol-Mure-Info.plist */; };
 		398138C62F925CCC009C4656 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 398138C52F925CCC009C4656 /* FirebaseAuth */; };
 		398138C82F925CD3009C4656 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 398138C72F925CD3009C4656 /* FirebaseFirestore */; };
 		398138CA2F925CE4009C4656 /* FirebaseDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 398138C92F925CE4009C4656 /* FirebaseDatabase */; };
@@ -35,6 +36,8 @@
 /* Begin PBXFileReference section */
 		3950B5D92FA0DA32006B8576 /* NewMyTabularRegressor 1.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = "NewMyTabularRegressor 1.mlmodel"; sourceTree = "<group>"; };
 		3950B5DB2FA337E1006B8576 /* CoconutPriceForecaster 1.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = "CoconutPriceForecaster 1.mlmodel"; sourceTree = "<group>"; };
+		3950B5E32FA35A9D006B8576 /* New-Pol-Mure.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "New-Pol-Mure.entitlements"; sourceTree = "<group>"; };
+		3950B5EB2FA36D86006B8576 /* New-Pol-Mure-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "New-Pol-Mure-Info.plist"; sourceTree = "<group>"; };
 		39F3727D2F878E51009A1CF2 /* New-Pol-Mure.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "New-Pol-Mure.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		39F3728F2F878E54009A1CF2 /* New-Pol-MureTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Pol-MureTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		39F372992F878E54009A1CF2 /* New-Pol-MureUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "New-Pol-MureUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -117,6 +120,8 @@
 		39F372742F878E51009A1CF2 = {
 			isa = PBXGroup;
 			children = (
+				3950B5E32FA35A9D006B8576 /* New-Pol-Mure.entitlements */,
+				3950B5EB2FA36D86006B8576 /* New-Pol-Mure-Info.plist */,
 				3950B5DB2FA337E1006B8576 /* CoconutPriceForecaster 1.mlmodel */,
 				3950B5D92FA0DA32006B8576 /* NewMyTabularRegressor 1.mlmodel */,
 				39F3727F2F878E51009A1CF2 /* App */,
@@ -272,6 +277,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3950B5EC2FA36D86006B8576 /* New-Pol-Mure-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -455,12 +461,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "New-Pol-Mure.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "New-Pol-Mure-Info.plist";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Polmure needs calendar access to schedule coconut inspections and pickups.";
 				INFOPLIST_KEY_NSCalendarsWriteOnlyAccessUsageDescription = "Polmure needs calendar access to schedule coconut pick-ups and estate inspections.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need the microphone to search for sellers by voice.";
+				INFOPLIST_KEY_NSSiriUsageDescription = "New Pol Mure uses Siri to quickly open market prices, activity, and harvest features.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "We use speech recognition to convert your voice to text";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -488,12 +499,17 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "New-Pol-Mure.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "New-Pol-Mure-Info.plist";
 				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Polmure needs calendar access to schedule coconut inspections and pickups.";
 				INFOPLIST_KEY_NSCalendarsWriteOnlyAccessUsageDescription = "Polmure needs calendar access to schedule coconut pick-ups and estate inspections.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need the microphone to search for sellers by voice.";
+				INFOPLIST_KEY_NSSiriUsageDescription = "New Pol Mure uses Siri to quickly open market prices, activity, and harvest features.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "We use speech recognition to convert your voice to text";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

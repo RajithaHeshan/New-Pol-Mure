@@ -7,7 +7,7 @@ struct Rating: Identifiable {
     let reviewerID: String
     let reviewerName: String
     let revieweeID: String
-    let stars: Int           // 1–5
+    let stars: Int           
     let comment: String
     let createdAt: Date
 

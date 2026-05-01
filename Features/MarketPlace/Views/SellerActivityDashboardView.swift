@@ -70,7 +70,7 @@ struct SellerActivityDashboardView: View {
                             }
 
                         } else if viewModel.selectedTab == 2 {
-                            // TRANSACTIONS
+                           
                             HStack {
                                 Text("Recent Financial Transactions")
                                     .font(.caption)
@@ -124,7 +124,7 @@ struct SellerActivityDashboardView: View {
     }
 }
 
-// MARK: - Empty State
+
 
 struct SellerEmptyActivityView: View {
     let message: String
@@ -143,7 +143,7 @@ struct SellerEmptyActivityView: View {
     }
 }
 
-// MARK: - Subviews
+
 
 struct SellerPendingPitchRow: View {
     let buyerName: String
@@ -296,7 +296,7 @@ struct SellerTransactionDetailCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header strip
+           
             HStack {
                 Image(systemName: "arrow.down.circle.fill")
                     .font(.title2)
