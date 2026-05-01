@@ -1,8 +1,4 @@
 import Intents
-import UIKit
-
-// Handles all 4 custom intents defined in NewPolMureIntents.intentdefinition
-// Xcode auto-generates doubled class names e.g. OpenActivityIntentIntent
 
 @objc(IntentHandler)
 class IntentHandler: INExtension,
@@ -15,6 +11,7 @@ class IntentHandler: INExtension,
     func handle(intent: OpenActivityIntentIntent) async -> OpenActivityIntentIntentResponse {
         let activity = NSUserActivity(activityType: "com.newpolmure.openactivity")
         activity.title = "Open Activity Tab"
+        activity.userInfo = ["action": "openactivity"]
         return OpenActivityIntentIntentResponse(code: .continueInApp, userActivity: activity)
     }
 
@@ -22,6 +19,7 @@ class IntentHandler: INExtension,
     func handle(intent: OpenUrgentIntentIntent) async -> OpenUrgentIntentIntentResponse {
         let activity = NSUserActivity(activityType: "com.newpolmure.openurgent")
         activity.title = "Open Urgent Tab"
+        activity.userInfo = ["action": "openurgent"]
         return OpenUrgentIntentIntentResponse(code: .continueInApp, userActivity: activity)
     }
 
@@ -29,6 +27,7 @@ class IntentHandler: INExtension,
     func handle(intent: OpenNewHarvestIntentIntent) async -> OpenNewHarvestIntentIntentResponse {
         let activity = NSUserActivity(activityType: "com.newpolmure.opennewharvest")
         activity.title = "Open New Harvest Tab"
+        activity.userInfo = ["action": "opennewharvest"]
         return OpenNewHarvestIntentIntentResponse(code: .continueInApp, userActivity: activity)
     }
 
@@ -36,6 +35,7 @@ class IntentHandler: INExtension,
     func handle(intent: OpenPerformanceIntentIntent) async -> OpenPerformanceIntentIntentResponse {
         let activity = NSUserActivity(activityType: "com.newpolmure.openperformance")
         activity.title = "Open View Performance"
+        activity.userInfo = ["action": "openperformance"]
         return OpenPerformanceIntentIntentResponse(code: .continueInApp, userActivity: activity)
     }
 }

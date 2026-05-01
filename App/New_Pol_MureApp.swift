@@ -29,10 +29,36 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func application(_ application: UIApplication,
                      continue userActivity: NSUserActivity,
                      restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        AppNavigationState.shared.handle(
-            activityType: userActivity.activityType,
-            userInfo: userActivity.userInfo
-        )
+        let type = userActivity.activityType
+        let info = userActivity.userInfo
+
+        // Direct activity type match (NSUserActivity based)
+        if type.contains("newpolmure") {
+            AppNavigationState.shared.handle(activityType: type, userInfo: info)
+            return true
+        }
+
+        // continueInApp from intent handler — read action from userInfo
+        if let action = info?["action"] as? String {
+            AppNavigationState.shared.handle(
+                activityType: "com.newpolmure.\(action)",
+                userInfo: info
+            )
+            return true
+        }
+
+        // Intent class name fallback — iOS sometimes passes the intent class name as activityType
+        switch type {
+        case "OpenActivityIntentIntent":
+            AppNavigationState.shared.handle(activityType: "com.newpolmure.openactivity", userInfo: nil)
+        case "OpenUrgentIntentIntent":
+            AppNavigationState.shared.handle(activityType: "com.newpolmure.openurgent", userInfo: nil)
+        case "OpenNewHarvestIntentIntent":
+            AppNavigationState.shared.handle(activityType: "com.newpolmure.opennewharvest", userInfo: nil)
+        case "OpenPerformanceIntentIntent":
+            AppNavigationState.shared.handle(activityType: "com.newpolmure.openperformance", userInfo: nil)
+        default: break
+        }
         return true
     }
 
@@ -69,13 +95,18 @@ struct New_Pol_MureApp: App {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environment(navState)
-                // Handle Siri shortcut when app is already open
+                // Handle via NSUserActivity activity types
                 .onContinueUserActivity(SiriActivityType.checkPrice.rawValue)     { navState.handle(activityType: $0.activityType, userInfo: $0.userInfo) }
                 .onContinueUserActivity(SiriActivityType.openActivity.rawValue)   { navState.handle(activityType: $0.activityType, userInfo: $0.userInfo) }
                 .onContinueUserActivity(SiriActivityType.openUrgent.rawValue)     { navState.handle(activityType: $0.activityType, userInfo: $0.userInfo) }
                 .onContinueUserActivity(SiriActivityType.openNewHarvest.rawValue) { navState.handle(activityType: $0.activityType, userInfo: $0.userInfo) }
                 .onContinueUserActivity(SiriActivityType.openAccount.rawValue)    { navState.handle(activityType: $0.activityType, userInfo: $0.userInfo) }
                 .onContinueUserActivity(SiriActivityType.openPerformance.rawValue){ navState.handle(activityType: $0.activityType, userInfo: $0.userInfo) }
+                // Handle via intent class names (continueInApp path)
+                .onContinueUserActivity("OpenActivityIntentIntent")    { _ in navState.handle(activityType: "com.newpolmure.openactivity",    userInfo: nil) }
+                .onContinueUserActivity("OpenUrgentIntentIntent")      { _ in navState.handle(activityType: "com.newpolmure.openurgent",      userInfo: nil) }
+                .onContinueUserActivity("OpenNewHarvestIntentIntent")  { _ in navState.handle(activityType: "com.newpolmure.opennewharvest",  userInfo: nil) }
+                .onContinueUserActivity("OpenPerformanceIntentIntent") { _ in navState.handle(activityType: "com.newpolmure.openperformance", userInfo: nil) }
         }
     }
 }
