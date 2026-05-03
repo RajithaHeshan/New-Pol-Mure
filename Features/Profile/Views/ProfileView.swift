@@ -1,14 +1,12 @@
 import SwiftUI
 import MapKit
 
+// MARK: - Account Root (shown when user taps avatar in toolbar)
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = ProfileViewModel()
 
-    @State private var inlineCameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609),
-        latitudinalMeters: 5000, longitudinalMeters: 5000
-    ))
+    private var accentColor: Color { viewModel.isSeller ? .green : .blue }
 
     var body: some View {
         NavigationStack {
@@ -16,18 +14,18 @@ struct ProfileView: View {
                 if viewModel.isLoading {
                     loadingView
                 } else {
-                    formView
+                    accountList
                 }
             }
-            .navigationTitle("Profile")
+            .navigationTitle("Account")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { toolbarContent }
-            .sheet(isPresented: $viewModel.isMapPresented) { mapSheet }
-            .onChange(of: viewModel.locationName) { _, _ in
-                inlineCameraPosition = .region(MKCoordinateRegion(
-                    center: viewModel.coordinate,
-                    latitudinalMeters: 5000, longitudinalMeters: 5000
-                ))
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(accentColor)
+                        .accessibilityLabel("Done")
+                        .accessibilityHint("Closes the Account screen")
+                }
             }
             .alert("Unable to Save", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -37,305 +35,478 @@ struct ProfileView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-            .overlay { if viewModel.saveSuccess { successOverlay } }
         }
         .onAppear { viewModel.load() }
     }
 
-   
+    // MARK: - Loading
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
-            Text("Loading profile...")
+                .accessibilityLabel("Loading account information")
+            Text("Loading account...")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-   
-    private var formView: some View {
-        Form {
-            profileHeaderSection
-            personalInfoSection
-            if viewModel.isSeller {
-                sellerProductionSection
-                estateLocationSection
-            } else {
-                buyerBusinessSection
-                buyerLocationSection
-            }
-            dangerZoneSection
-        }
-    }
-
-   
-    private var profileHeaderSection: some View {
-        Section {
-            HStack {
-                Spacer()
-                VStack(spacing: 8) {
-                    Image(viewModel.profileImageName.isEmpty ? "person.circle" : viewModel.profileImageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(viewModel.isSeller ? Color.green : Color.blue, lineWidth: 2))
-                        .shadow(radius: 4)
-
-                    VStack(spacing: 2) {
-                        Text(viewModel.fullName.isEmpty ? "Your Name" : viewModel.fullName)
-                            .font(.headline)
-                        Text(viewModel.email)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(viewModel.isSeller ? "Seller Account" : "Buyer Account")
-                            .font(.caption2.bold())
-                            .foregroundColor(viewModel.isSeller ? .green : .blue)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 3)
-                            .background((viewModel.isSeller ? Color.green : Color.blue).opacity(0.1))
-                            .clipShape(Capsule())
-                    }
-                }
-                Spacer()
-            }
-            .padding(.vertical, 8)
-        }
-        .listRowBackground(Color.clear)
-    }
-
-    // MARK: - Personal Info
-    private var personalInfoSection: some View {
-        Section(header: Text("Personal Information")) {
-            HStack {
-                Label("Full Name", systemImage: "person.fill")
-                    .foregroundColor(.secondary)
-                    .frame(width: 130, alignment: .leading)
-                TextField("Enter your name", text: $viewModel.fullName)
-                    .multilineTextAlignment(.trailing)
-                    .textContentType(.name)
-            }
-
-            HStack {
-                Label("Phone", systemImage: "phone.fill")
-                    .foregroundColor(.secondary)
-                    .frame(width: 130, alignment: .leading)
-                TextField("Phone number", text: $viewModel.phone)
-                    .multilineTextAlignment(.trailing)
-                    .keyboardType(.phonePad)
-                    .textContentType(.telephoneNumber)
-            }
-
-            HStack {
-                Label("Email", systemImage: "envelope.fill")
-                    .foregroundColor(.secondary)
-                    .frame(width: 130, alignment: .leading)
-                Text(viewModel.email)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-            }
-        }
-    }
-
-    // MARK: - Seller: Production
-    private var sellerProductionSection: some View {
-        Section(header: Text("Production Details")) {
-            HStack {
-                Label("Yield / Harvest", systemImage: "leaf.fill")
-                    .foregroundColor(.secondary)
-                    .frame(width: 140, alignment: .leading)
-                TextField("e.g. 10000", text: $viewModel.typicalYield)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .foregroundColor(.green)
-                Text("Nuts")
-                    .foregroundColor(.secondary)
-            }
-
-            DatePicker("Next Harvest", selection: $viewModel.nextHarvestDate, displayedComponents: .date)
-
-            Picker("Certification", selection: $viewModel.certificationLevel) {
-                ForEach(viewModel.certificationLevels, id: \.self) { Text($0) }
-            }
-            .tint(.green)
-        }
-    }
-
-    // MARK: - Seller: Estate Location
-    private var estateLocationSection: some View {
-        Section(header: Text("Estate Location")) {
-            ZStack {
-                Map(position: $inlineCameraPosition, interactionModes: []) {
-                    MapCircle(center: viewModel.coordinate, radius: 2000)
-                        .foregroundStyle(.green.opacity(0.3))
-                    Marker("Estate", coordinate: viewModel.coordinate).tint(.green)
-                }
-                .frame(height: 140)
-                Button(action: { viewModel.isMapPresented = true }) { Color.clear }
-            }
-            .listRowInsets(EdgeInsets())
-            .overlay(alignment: .topTrailing) {
-                Button(action: { viewModel.isMapPresented = true }) {
-                    Image(systemName: "arrow.up.backward.and.arrow.down.forward")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.green)
-                        .frame(width: 32, height: 32)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(radius: 2)
-                }
-                .padding(12)
-                .buttonStyle(PlainButtonStyle())
-            }
-
-            HStack {
-                Text("Selected Zone")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(viewModel.locationName)
-                    .font(.subheadline.bold())
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-    }
-
-    // MARK: - Buyer: Business
-    private var buyerBusinessSection: some View {
-        Section(header: Text("Business Profile")) {
-            Picker("Business Type", selection: $viewModel.businessType) {
-                ForEach(viewModel.businessTypes, id: \.self) { Text($0) }
-            }
-            .tint(.blue)
-
-            HStack {
-                Label("Typical Volume", systemImage: "basket.fill")
-                    .foregroundColor(.secondary)
-                    .frame(width: 140, alignment: .leading)
-                TextField("e.g. 5000", text: $viewModel.typicalVolume)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.trailing)
-                    .foregroundColor(.blue)
-                Text("Nuts")
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-
-    // MARK: - Buyer: Sourcing Location
-    private var buyerLocationSection: some View {
-        Section(header: Text("Sourcing Location")) {
-            ZStack {
-                Map(position: $inlineCameraPosition, interactionModes: []) {
-                    MapCircle(center: viewModel.coordinate, radius: 2000)
-                        .foregroundStyle(.blue.opacity(0.3))
-                    Marker("Zone", coordinate: viewModel.coordinate).tint(.blue)
-                }
-                .frame(height: 140)
-                Button(action: { viewModel.isMapPresented = true }) { Color.clear }
-            }
-            .listRowInsets(EdgeInsets())
-            .overlay(alignment: .topTrailing) {
-                Button(action: { viewModel.isMapPresented = true }) {
-                    Image(systemName: "arrow.up.backward.and.arrow.down.forward")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.blue)
-                        .frame(width: 32, height: 32)
-                        .background(Color.white)
-                        .clipShape(Circle())
-                        .shadow(radius: 2)
-                }
-                .padding(12)
-                .buttonStyle(PlainButtonStyle())
-            }
-
-            HStack {
-                Text("Selected Zone")
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(viewModel.locationName)
-                    .font(.subheadline.bold())
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.trailing)
-            }
-        }
-    }
-
-    // MARK: - Danger Zone
-    private var dangerZoneSection: some View {
-        Section {
-            Button(role: .destructive) {
-                viewModel.signOut()
-                dismiss()
-            } label: {
+    // MARK: - Main Account List (iOS Settings style)
+    private var accountList: some View {
+        List {
+            // Avatar header — not tappable, purely display
+            Section {
                 HStack {
                     Spacer()
-                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
-                        .font(.headline)
+                    VStack(spacing: 8) {
+                        Image(viewModel.profileImageName.isEmpty ? "person.circle" : viewModel.profileImageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 72, height: 72)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(accentColor, lineWidth: 2.5))
+                            .shadow(color: accentColor.opacity(0.25), radius: 6)
+                            .accessibilityHidden(true)
+
+                        Text(viewModel.fullName.isEmpty ? "Your Name" : viewModel.fullName)
+                            .font(.title3.bold())
+
+                        Text(viewModel.email)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        Text(viewModel.isSeller ? "Seller Account" : "Buyer Account")
+                            .font(.caption.bold())
+                            .foregroundColor(accentColor)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(accentColor.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
                     Spacer()
                 }
+                .padding(.vertical, 10)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                // Group the whole header as a single accessible element
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel({
+                    let name = viewModel.fullName.isEmpty ? "Your Name" : viewModel.fullName
+                    let role = viewModel.isSeller ? "Seller Account" : "Buyer Account"
+                    return "\(name), \(viewModel.email), \(role)"
+                }())
+            }
+
+            // MARK: Account Section
+            Section {
+                NavigationLink(destination: PersonalInfoEditView(viewModel: viewModel)) {
+                    accountRow(
+                        icon: "person.fill",
+                        iconColor: .blue,
+                        title: "Personal Information",
+                        subtitle: viewModel.fullName.isEmpty ? "Name, phone, email" : viewModel.fullName
+                    )
+                }
+                .accessibilityLabel("Personal Information")
+                .accessibilityHint(viewModel.fullName.isEmpty ? "Name, phone, and email not set. Double tap to edit." : "Current name: \(viewModel.fullName). Double tap to edit.")
+
+                if viewModel.isSeller {
+                    NavigationLink(destination: SellerProductionEditView(viewModel: viewModel)) {
+                        accountRow(
+                            icon: "leaf.fill",
+                            iconColor: .green,
+                            title: "Production Details",
+                            subtitle: viewModel.typicalYield.isEmpty ? "Yield, harvest date, certification" : "\(viewModel.typicalYield) Nuts"
+                        )
+                    }
+                    .accessibilityLabel("Production Details")
+                    .accessibilityHint(viewModel.typicalYield.isEmpty ? "Yield and harvest details not set. Double tap to edit." : "Typical yield: \(viewModel.typicalYield) nuts. Double tap to edit.")
+
+                    NavigationLink(destination: LocationEditView(viewModel: viewModel)) {
+                        accountRow(
+                            icon: "mappin.and.ellipse",
+                            iconColor: .orange,
+                            title: "Estate Location",
+                            subtitle: viewModel.locationName.isEmpty ? "Set your estate location" : viewModel.locationName
+                        )
+                    }
+                    .accessibilityLabel("Estate Location")
+                    .accessibilityHint(viewModel.locationName.isEmpty ? "Location not set. Double tap to choose on map." : "Current location: \(viewModel.locationName). Double tap to change.")
+                } else {
+                    NavigationLink(destination: BuyerBusinessEditView(viewModel: viewModel)) {
+                        accountRow(
+                            icon: "briefcase.fill",
+                            iconColor: .purple,
+                            title: "Business Profile",
+                            subtitle: viewModel.businessType.isEmpty ? "Type, typical volume" : viewModel.businessType
+                        )
+                    }
+                    .accessibilityLabel("Business Profile")
+                    .accessibilityHint(viewModel.businessType.isEmpty ? "Business type and volume not set. Double tap to edit." : "Business type: \(viewModel.businessType). Double tap to edit.")
+
+                    NavigationLink(destination: LocationEditView(viewModel: viewModel)) {
+                        accountRow(
+                            icon: "mappin.and.ellipse",
+                            iconColor: .orange,
+                            title: "Sourcing Location",
+                            subtitle: viewModel.locationName.isEmpty ? "Set your sourcing zone" : viewModel.locationName
+                        )
+                    }
+                    .accessibilityLabel("Sourcing Location")
+                    .accessibilityHint(viewModel.locationName.isEmpty ? "Location not set. Double tap to choose on map." : "Current location: \(viewModel.locationName). Double tap to change.")
+                }
+            } header: {
+                Text("Account")
+            }
+
+            // MARK: Sign Out
+            Section {
+                Button(role: .destructive) {
+                    viewModel.signOut()
+                    dismiss()
+                } label: {
+                    HStack {
+                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                            .accessibilityHidden(true)
+                        Text("Sign Out")
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.red)
+                }
+                .accessibilityLabel("Sign Out")
+                .accessibilityHint("Signs you out of your account")
             }
         }
+        .listStyle(.insetGrouped)
     }
 
-    // MARK: - Map Sheet
-    @ViewBuilder
-    private var mapSheet: some View {
-        if viewModel.isSeller {
-            EstateLocationMapScreen(
-                estateLocation: $viewModel.coordinate,
-                locationName: $viewModel.locationName
-            )
-        } else {
-            BuyerFullScreenLocationPicker(
-                buyerLocation: $viewModel.coordinate,
-                locationName: $viewModel.locationName
-            )
-        }
-    }
+    // MARK: - Reusable Account Row
+    private func accountRow(icon: String, iconColor: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 30, height: 30)
+                .background(iconColor)
+                .cornerRadius(7)
+                .accessibilityHidden(true)
 
-    // MARK: - Toolbar
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
-            Button("Cancel") { dismiss() }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
         }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button(action: { viewModel.save() }) {
-                if viewModel.isSaving {
-                    ProgressView().scaleEffect(0.8)
-                } else {
-                    Text("Save")
-                        .fontWeight(.semibold)
-                        .foregroundColor(viewModel.isSeller ? .green : .blue)
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Personal Information Edit Screen
+struct PersonalInfoEditView: View {
+    @Bindable var viewModel: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+    private var accentColor: Color { viewModel.isSeller ? .green : .blue }
+
+    var body: some View {
+        List {
+            Section {
+                editRow(icon: "person.fill", label: "Full Name") {
+                    TextField("Enter your name", text: $viewModel.fullName)
+                        .multilineTextAlignment(.trailing)
+                        .textContentType(.name)
+                        .accessibilityLabel("Full Name")
+                        .accessibilityHint("Enter your full name")
+                }
+                editRow(icon: "phone.fill", label: "Phone") {
+                    TextField("Phone number", text: $viewModel.phone)
+                        .multilineTextAlignment(.trailing)
+                        .keyboardType(.phonePad)
+                        .textContentType(.telephoneNumber)
+                        .accessibilityLabel("Phone number")
+                        .accessibilityHint("Enter your phone number")
+                }
+                HStack {
+                    Label("Email", systemImage: "envelope.fill")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                    Spacer()
+                    Text(viewModel.email)
+                        .foregroundColor(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Email: \(viewModel.email)")
+                .accessibilityHint("Email address cannot be changed")
+            } footer: {
+                Text("Email cannot be changed.")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Personal Information")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") {
+                    viewModel.save()
+                    dismiss()
+                }
+                .fontWeight(.semibold)
+                .foregroundColor(accentColor)
+                .disabled(viewModel.isSaving)
+                .accessibilityLabel("Save personal information")
+                .accessibilityHint("Saves your name and phone number")
+            }
+        }
+        .overlay { if viewModel.saveSuccess { saveSuccessOverlay(accentColor: accentColor) } }
+    }
+}
+
+// MARK: - Seller Production Edit Screen
+struct SellerProductionEditView: View {
+    @Bindable var viewModel: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            Section {
+                HStack {
+                    Label("Yield / Harvest", systemImage: "leaf.fill")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                    Spacer()
+                    TextField("e.g. 10000", text: $viewModel.typicalYield)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundColor(.green)
+                        .frame(width: 80)
+                        .accessibilityLabel("Typical yield in nuts")
+                        .accessibilityHint("Enter the number of coconuts you typically harvest")
+                    Text("Nuts")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                }
+                DatePicker("Next Harvest", selection: $viewModel.nextHarvestDate, displayedComponents: .date)
+                    .tint(.green)
+                    .accessibilityLabel("Next harvest date")
+                    .accessibilityHint("Select the date of your next expected harvest")
+                Picker("Certification", selection: $viewModel.certificationLevel) {
+                    ForEach(viewModel.certificationLevels, id: \.self) { Text($0) }
+                }
+                .tint(.green)
+                .accessibilityLabel("Certification level")
+                .accessibilityHint("Select your coconut certification level")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Production Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") { viewModel.save(); dismiss() }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.green)
+                    .disabled(viewModel.isSaving)
+                    .accessibilityLabel("Save production details")
+                    .accessibilityHint("Saves yield, harvest date, and certification")
+            }
+        }
+        .overlay { if viewModel.saveSuccess { saveSuccessOverlay(accentColor: .green) } }
+    }
+}
+
+// MARK: - Buyer Business Edit Screen
+struct BuyerBusinessEditView: View {
+    @Bindable var viewModel: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            Section {
+                Picker("Business Type", selection: $viewModel.businessType) {
+                    ForEach(viewModel.businessTypes, id: \.self) { Text($0) }
+                }
+                .tint(.blue)
+                .accessibilityLabel("Business type")
+                .accessibilityHint("Select the type of your business")
+                HStack {
+                    Label("Typical Volume", systemImage: "basket.fill")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                    Spacer()
+                    TextField("e.g. 5000", text: $viewModel.typicalVolume)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundColor(.blue)
+                        .frame(width: 80)
+                        .accessibilityLabel("Typical purchase volume in nuts")
+                        .accessibilityHint("Enter the number of coconuts you typically buy")
+                    Text("Nuts")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
                 }
             }
-            .disabled(viewModel.isSaving)
         }
-    }
-
-    // MARK: - Save Success Overlay
-    private var successOverlay: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
-                .foregroundColor(viewModel.isSeller ? .green : .blue)
-            Text("Profile Updated")
-                .font(.title2.bold())
-            Text("Your changes have been saved.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.ultraThinMaterial)
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                viewModel.saveSuccess = false
-                dismiss()
+        .listStyle(.insetGrouped)
+        .navigationTitle("Business Profile")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") { viewModel.save(); dismiss() }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.blue)
+                    .disabled(viewModel.isSaving)
+                    .accessibilityLabel("Save business profile")
+                    .accessibilityHint("Saves business type and typical volume")
             }
         }
+        .overlay { if viewModel.saveSuccess { saveSuccessOverlay(accentColor: .blue) } }
     }
+}
+
+// MARK: - Location Edit Screen (shared buyer + seller)
+struct LocationEditView: View {
+    @Bindable var viewModel: ProfileViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var cameraPosition: MapCameraPosition = .region(MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609),
+        latitudinalMeters: 5000, longitudinalMeters: 5000
+    ))
+
+    private var accentColor: Color { viewModel.isSeller ? .green : .blue }
+    private var title: String { viewModel.isSeller ? "Estate Location" : "Sourcing Location" }
+
+    var body: some View {
+        List {
+            Section {
+                ZStack {
+                    Map(position: $cameraPosition, interactionModes: []) {
+                        MapCircle(center: viewModel.coordinate, radius: 2000)
+                            .foregroundStyle(accentColor.opacity(0.25))
+                        Marker(viewModel.isSeller ? "Estate" : "Zone", coordinate: viewModel.coordinate)
+                            .tint(accentColor)
+                    }
+                    .frame(height: 180)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    Button(action: { viewModel.isMapPresented = true }) { Color.clear }
+                }
+                .listRowInsets(EdgeInsets())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(viewModel.locationName.isEmpty
+                    ? "Map preview. No location selected."
+                    : "Map preview showing \(viewModel.locationName).")
+                .accessibilityHint("Double tap to open the full map and pick a location")
+                .accessibilityAddTraits(.isButton)
+                .overlay(alignment: .topTrailing) {
+                    Button(action: { viewModel.isMapPresented = true }) {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(accentColor)
+                            .frame(width: 30, height: 30)
+                            .background(Color(UIColor.systemBackground))
+                            .clipShape(Circle())
+                            .shadow(radius: 2)
+                    }
+                    .padding(10)
+                    .buttonStyle(PlainButtonStyle())
+                    .accessibilityHidden(true)
+                }
+
+                HStack {
+                    Label("Selected Zone", systemImage: "location.fill")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                        .accessibilityHidden(true)
+                    Spacer()
+                    Text(viewModel.locationName.isEmpty ? "Not set" : viewModel.locationName)
+                        .font(.subheadline.bold())
+                        .multilineTextAlignment(.trailing)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Selected location: \(viewModel.locationName.isEmpty ? "not set" : viewModel.locationName)")
+
+                Button(action: { viewModel.isMapPresented = true }) {
+                    HStack {
+                        Spacer()
+                        Label("Change Location", systemImage: "map.fill")
+                            .font(.subheadline.bold())
+                            .foregroundColor(accentColor)
+                        Spacer()
+                    }
+                }
+                .accessibilityLabel("Change location")
+                .accessibilityHint("Opens the full map to pick a new location")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Save") { viewModel.save(); dismiss() }
+                    .fontWeight(.semibold)
+                    .foregroundColor(accentColor)
+                    .disabled(viewModel.isSaving)
+                    .accessibilityLabel("Save location")
+                    .accessibilityHint("Saves the selected \(viewModel.isSeller ? "estate" : "sourcing") location")
+            }
+        }
+        .sheet(isPresented: $viewModel.isMapPresented) {
+            if viewModel.isSeller {
+                EstateLocationMapScreen(estateLocation: $viewModel.coordinate, locationName: $viewModel.locationName)
+            } else {
+                BuyerFullScreenLocationPicker(buyerLocation: $viewModel.coordinate, locationName: $viewModel.locationName)
+            }
+        }
+        .onChange(of: viewModel.locationName) { _, _ in
+            cameraPosition = .region(MKCoordinateRegion(
+                center: viewModel.coordinate,
+                latitudinalMeters: 5000, longitudinalMeters: 5000
+            ))
+        }
+        .overlay { if viewModel.saveSuccess { saveSuccessOverlay(accentColor: accentColor) } }
+    }
+}
+
+// MARK: - Shared helper row builder
+private func editRow<Content: View>(icon: String, label: String, @ViewBuilder trailing: () -> Content) -> some View {
+    HStack(spacing: 10) {
+        Image(systemName: icon)
+            .foregroundColor(.secondary)
+            .font(.subheadline)
+            .frame(width: 20)
+            .accessibilityHidden(true)
+        Text(label)
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+        Spacer()
+        trailing()
+    }
+    .padding(.vertical, 4)
+}
+
+// MARK: - Shared save success overlay
+private func saveSuccessOverlay(accentColor: Color) -> some View {
+    VStack(spacing: 16) {
+        Image(systemName: "checkmark.circle.fill")
+            .font(.system(size: 60))
+            .foregroundColor(accentColor)
+            .accessibilityHidden(true)
+        Text("Saved")
+            .font(.title2.bold())
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .background(.ultraThinMaterial)
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel("Changes saved successfully")
 }
 
 #Preview {
