@@ -8,9 +8,9 @@ import UserNotifications
 @MainActor
 class DiscoveryDashboardViewModel {
 
-    // MARK: - UI State
+   
     var searchText = "" {
-        didSet { scheduleLocationSearch() }
+        didSet { scheduleLocationSearch() }   //debounce location
     }
     var selectedFilter = "All"
     let filters = ["All", "High Volume", "Ending Soon", "Nearest to Me"]
@@ -19,37 +19,37 @@ class DiscoveryDashboardViewModel {
     var showNotifications = false
     var unreadNotificationCount = 3
 
-    // Image State (Defaulting to your asset in case of slow internet)
+ 
     var profileImageName: String = "Gemini_Generated_Image_l5uvm3l5uvm3l5uv"
 
-    // MARK: - Map State
+    // Map State
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609) // Default: Kurunegala
     var searchRadius: Double = 50.0
     var isFullScreenMapPresented = false
 
-    // MARK: - Search State
+    // Search city name
     var isSearchingLocation = false
-    private var searchTask: Task<Void, Never>?
+    private var searchTask: Task<Void, Never>? // cancel old secrh
 
-    // MARK: - Sellers Data (Real-time listener)
+    // Sellers Data
     var allSellers: [SellerLocation] = []
     var isLoadingSellers = false
-    private var sellersListener: ListenerRegistration?
+    private var sellersListener: ListenerRegistration? //Listner firebase push the changers
 
-    // MARK: - Highest Bids Per Seller (sellerID → highest bid amount)
+   // Highest Bids Per Seller
     var highestBids: [String: Double] = [:]
-    private var bidsListener: ListenerRegistration?
+    private var bidsListener: ListenerRegistration? //bidlistner automatically update
 
     // MARK: - Active Harvest Lots (from harvestLots collection)
     var activeHarvests: [HarvestLotItem] = []
     var isLoadingHarvests = false
-    private var harvestsListener: ListenerRegistration?
+    private var harvestsListener: ListenerRegistration? //automatically update harvest
 
-    // MARK: - Seller Ratings Map (sellerID → (averageRating, ratingCount))
+    //  Ratings Map
     var sellerRatings: [String: (Double, Int)] = [:]
     private var sellerRatingsListener: ListenerRegistration?
 
-    // MARK: - Buyer Profile (used by ML engine)
+    //  Buyer Profile (used by ML engine)
     private var buyerVolume: Int = 5000
     private var buyerNeedsExport: Bool = false
 
@@ -71,25 +71,27 @@ class DiscoveryDashboardViewModel {
         requestNotificationPermission()
     }
 
-    // MARK: - Firebase Fetch Logic
+    // Firebase Fetch Logic Buyerprofile
     func fetchUserProfile() {
-        let userId = AuthManager.shared.currentUserID
-        guard !userId.isEmpty else { return }
+        let userId = AuthManager.shared.currentUserID //check currently loged in
+        guard !userId.isEmpty else { return }  //gurd prevent empty document id and prevent app crash or
 
-        Task {
-            do {
+        Task {  //tell the app and fetch data in the background
+            do { //prevent crash application (internet loses)
                 let document = try await Firestore.firestore().collection("users").document(userId).getDocument()
-                let data = document.data() ?? [:]
+                let data = document.data() ?? [:]  //if file is compltly empty and create empty dictonary and prevent
 
                 if let imageName = data["profileImageName"] as? String {
                     self.profileImageName = imageName
                 }
+                
 
-                // Decode buyer profile for ML scoring
+               
                 if let vol = data["typicalVolume"] as? String {
                     self.buyerVolume = RecommendationEngine.parseVolume(vol)
                 }
                 self.buyerNeedsExport = (data["needsExport"] as? Bool) ?? false
+                
 
                 // Centre map on buyer's registered location
                 if let lat = data["latitude"] as? Double,
@@ -97,22 +99,23 @@ class DiscoveryDashboardViewModel {
                     self.searchCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
                 }
 
-                // Re-score now that buyer profile is loaded with correct volume
-                self.computeMLRecommendations()
+                self.computeMLRecommendations() //for Ml engine
             } catch {
                 print("Error fetching profile from Firestore: \(error.localizedDescription)")
             }
         }
     }
 
-    // MARK: - Real-Time Sellers Listener
-    // Replaces one-shot fetch so profile edits (yield, cert, location) appear immediately on the buyer side.
+    
+    
+    
+    //sellers
     private func attachSellersListener() {
         isLoadingSellers = true
         sellersListener = Firestore.firestore()
             .collection("users")
             .whereField("role", isEqualTo: "SELLER")
-            .addSnapshotListener { [weak self] snapshot, error in
+            .addSnapshotListener { [weak self] snapshot, error in      //using snapshot listner change buyer data immedialy without change
                 guard let self else { return }
                 if let error {
                     print("Sellers listener error: \(error.localizedDescription)")
@@ -131,13 +134,16 @@ class DiscoveryDashboardViewModel {
                         let yield         = data["typicalYield"]       as? String ?? "N/A"
                         let cert          = data["certificationLevel"] as? String ?? "Standard"
                         let harvestDate   = (data["nextHarvestDate"] as? Timestamp)?.dateValue() ?? Date()
+                        
+                        
 
                         let coordinate: CLLocationCoordinate2D
                         if let lat = data["latitude"] as? Double,
                            let lng = data["longitude"] as? Double {
                             coordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                            
                         } else {
-                            if let resolved = await self.geocode(locationName: location) {
+                            if let resolved = await self.geocode(locationName: location) {  //location convert to codinates
                                 coordinate = resolved
                                 try? await Firestore.firestore()
                                     .collection("users")
@@ -165,8 +171,7 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // MARK: - Real-Time Bids Listener
-    // Groups by sellerID (for registered seller bids) and harvestID (for harvest bids)
+  
     private func attachBidsListener() {
         bidsListener = Firestore.firestore()
             .collection("bids")
@@ -186,7 +191,7 @@ class DiscoveryDashboardViewModel {
                     }
                     // Index by sellerID for registered-seller bids
                     if let sellerID = data["sellerID"] as? String, !sellerID.isEmpty {
-                        if (bids[sellerID] ?? 0) < amount {
+                        if (bids[sellerID] ?? 0) < amount {   //only higherbid for per key not only latest
                             bids[sellerID] = amount
                         }
                     }
@@ -196,16 +201,17 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // MARK: - Highest Bid Helpers
+    //  Highest Bid Helpers
     func highestBid(for seller: SellerLocation) -> Double {
-        highestBids[seller.id] ?? 0.0
+        highestBids[seller.id] ?? 0.0 //if no bidts yet prevent show zero defor bidslostener load
     }
 
     func highestBid(for harvest: HarvestLotItem) -> Double {
         highestBids[harvest.id] ?? harvest.currentBid
     }
 
-    // MARK: - Harvests filtered by their own location within the search radius
+    // Harvests filtered by their own location within the search radius
+    
     var harvestsInRadius: [HarvestLotItem] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return activeHarvests.filter { harvest in
@@ -214,7 +220,7 @@ class DiscoveryDashboardViewModel {
         }
     }
 
-    // MARK: - Seller Ratings Listener — keeps sellerID → (avg, count) map live
+    // MARK: - Seller Ratings Listener
     private func attachSellerRatingsListener() {
         sellerRatingsListener = Firestore.firestore()
             .collection("users")
@@ -232,10 +238,10 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // MARK: - Live Harvests Listener (all sellers' active harvest lots)
+    // MARK: - Live Harvests Listener (all sellers' active harvest and sellers create harvest)
     private func attachHarvestsListener() {
         isLoadingHarvests = true
-        harvestsListener = Firestore.firestore()
+        harvestsListener = Firestore.firestore()  // firebse harvest lost collection
             .collection("harvestLots")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
@@ -280,8 +286,7 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // MARK: - ML Recommendation Scoring
-    // Scores registered sellers AND harvest lots, caches top 5 of each.
+    
     func computeMLRecommendations() {
         let engine = RecommendationEngine.shared
         let avgMarketBid = highestBids.values.reduce(0, +) / max(1, Double(highestBids.count))
@@ -295,7 +300,7 @@ class DiscoveryDashboardViewModel {
                 let priceDelta      = sellerBid - avgMarketBid
                 let txCount         = historicalTransactions[seller.id] ?? 0
 
-                let score = engine.scoreSellerForBuyer(
+                let score = engine.scoreSellerForBuyer( //utility folder
                     buyerVolume: buyerVolume,
                     sellerVolume: sellerVolume,
                     buyerLocation: searchCenter,
@@ -303,7 +308,7 @@ class DiscoveryDashboardViewModel {
                     buyerNeedsExport: buyerNeedsExport,
                     sellerHasExport: sellerHasExport,
                     priceDelta: priceDelta,
-                    historicalTransactions: txCount
+                    historicalTransactions: txCount  //how many times buyer complete deal
                 )
                 return (seller, score)
             }
@@ -312,8 +317,10 @@ class DiscoveryDashboardViewModel {
                 .prefix(5)
                 .map { $0.0 }
         }
+        
+        
 
-        // Score harvest lots — use their own quantity and the seller's certification from sellerRatings
+        // register seller create harvest (property) include recommndation system
         if !activeHarvests.isEmpty {
             let scoredHarvests: [(HarvestLotItem, Double)] = activeHarvests.map { harvest in
                 let harvestVolume   = harvest.quantity
@@ -343,10 +350,10 @@ class DiscoveryDashboardViewModel {
         }
     }
 
-    // MARK: - Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
-    private func geocode(locationName: String) async -> CLLocationCoordinate2D? {
+    // Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
+    private func geocode(locationName: String) async -> CLLocationCoordinate2D? {  //place name conver to GPS
         let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = locationName + ", Sri Lanka"
+        request.naturalLanguageQuery = locationName + ", Sri Lanka"  //apend sri-lanaka
         request.region = MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
             latitudinalMeters: 500_000,
@@ -356,10 +363,12 @@ class DiscoveryDashboardViewModel {
         let response = try? await search.start()
         return response?.mapItems.first?.placemark.coordinate
     }
+    
+    
 
     // MARK: - Location Search (Moves map center when user types in search bar)
     private func scheduleLocationSearch() {
-        searchTask?.cancel()
+        searchTask?.cancel()  //cancel previouse pending search. this is debounce machnisam . only the last call (after they stop typing for 0.5s) actually fires
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
 
@@ -389,6 +398,9 @@ class DiscoveryDashboardViewModel {
         }
     }
 
+    
+    
+    
     // MARK: - Filtered Sellers Within Search Radius
     var sellersInRadius: [SellerLocation] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
@@ -416,8 +428,7 @@ class DiscoveryDashboardViewModel {
         return results
     }
 
-    // ML-powered: returns top-5 sellers scored by the CoreML model.
-    // Returns empty while loading so UI shows ProgressView, not a flickering distance-sort list.
+    
     var recommendedSellers: [SellerLocation] {
         if !mlRecommendedSellers.isEmpty { return mlRecommendedSellers }
         // Still loading — return empty so ProgressView shows instead of wrong order

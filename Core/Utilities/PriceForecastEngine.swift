@@ -1,6 +1,6 @@
 import CoreML
 
-// Zone ID encoding — must match the CSV training data exactly
+// Zone ID encoding — must match the CSV training data
 private let zoneEncoding: [String: Int64] = [
     "anuradhapura": 0,
     "colombo":      1,

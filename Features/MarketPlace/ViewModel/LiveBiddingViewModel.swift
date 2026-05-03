@@ -111,8 +111,9 @@ class LiveBiddingViewModel {
         Task {
             do {
                 let bidData: [String: Any] = [
-                    "harvestID":  lot.id,      
-                    "sellerID":   lot.sellerID,  // seller's user ID — for SellerActivityDashboard
+                    "harvestID":  lot.id,
+                    "sellerID":   lot.sellerID,
+                    "sellerName": lot.sellerInitial,
                     "bidderID":   currentBuyerID,
                     "bidderName": currentBuyerName,
                     "amount":     newBid,
@@ -156,7 +157,7 @@ class LiveBiddingViewModel {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
+    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {  //exceed bid 
         let sellerName = lot.sellerInitial
         let lotID = lot.id
         UNUserNotificationCenter.current().getNotificationSettings { settings in

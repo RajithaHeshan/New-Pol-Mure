@@ -7,6 +7,7 @@ struct Bid: Identifiable {
     let id: String
     let harvestID: String   // Harvest document ID — used by LiveBiddingViewModel listener
     let sellerID: String    // Seller's user ID — used by SellerActivityDashboard
+    let sellerName: String  // Seller's display name — shown in buyer's Activity tab
     let bidderID: String
     let bidderName: String
     let amount: Double
@@ -22,8 +23,9 @@ struct Bid: Identifiable {
         else { return nil }
 
         self.id         = id
-        self.harvestID  = data["harvestID"] as? String ?? ""
-        self.sellerID   = data["sellerID"]  as? String ?? ""
+        self.harvestID  = data["harvestID"]  as? String ?? ""
+        self.sellerID   = data["sellerID"]   as? String ?? ""
+        self.sellerName = data["sellerName"] as? String ?? ""
         self.bidderID   = bidderID
         self.bidderName = bidderName
         self.amount     = amount

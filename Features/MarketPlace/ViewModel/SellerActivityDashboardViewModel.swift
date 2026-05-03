@@ -52,12 +52,26 @@ class SellerActivityDashboardViewModel {
 
     init() {
         self.currentSellerID = AuthManager.shared.currentUserID
+        loadCachedData()
         attachOffersListener()
         attachAllOffersListener()
         attachBidsListener()
         attachTransactionsListener()
         attachContractsListener()
         attachUrgentRequestsListener()
+    }
+
+    private func loadCachedData() {
+        guard !currentSellerID.isEmpty else { return }
+        let cache = CoreDataCache.shared
+        let cachedOffers = cache.loadOffers(ownerID: currentSellerID)
+        if !cachedOffers.isEmpty { myOffers = cachedOffers }
+        let cachedBids = cache.loadBids(ownerID: currentSellerID)
+        if !cachedBids.isEmpty { incomingBids = cachedBids }
+        let cachedTx = cache.loadTransactions(ownerID: currentSellerID)
+        if !cachedTx.isEmpty { transactions = cachedTx }
+        let cachedContracts = cache.loadContracts(ownerID: currentSellerID)
+        if !cachedContracts.isEmpty { contracts = cachedContracts }
     }
 
     // MARK: - Tab 0: My Offers Listener
@@ -81,6 +95,7 @@ class SellerActivityDashboardViewModel {
                     Offer(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
+                CoreDataCache.shared.saveOffers(self.myOffers, ownerID: self.currentSellerID)
                 self.isLoadingOffers = false
             }
     }
@@ -166,6 +181,7 @@ class SellerActivityDashboardViewModel {
                 }
 
                 self.incomingBids = updated
+                CoreDataCache.shared.saveBids(updated, ownerID: self.currentSellerID)
                 self.isLoadingBids = false
             }
     }
@@ -279,6 +295,7 @@ class SellerActivityDashboardViewModel {
                     Transaction(id: $0.documentID, data: $0.data())
                 }.sorted { $0.completedAt > $1.completedAt } ?? []
 
+                CoreDataCache.shared.saveTransactions(self.transactions, ownerID: self.currentSellerID)
                 self.isLoadingTransactions = false
             }
     }
@@ -304,11 +321,12 @@ class SellerActivityDashboardViewModel {
                     Contract(id: $0.documentID, data: $0.data())
                 }.sorted { $0.createdAt > $1.createdAt } ?? []
 
+                CoreDataCache.shared.saveContracts(self.contracts, ownerID: self.currentSellerID)
                 self.isLoadingContracts = false
             }
     }
 
-   
+
     func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium

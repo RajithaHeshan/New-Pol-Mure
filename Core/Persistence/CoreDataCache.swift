@@ -57,10 +57,9 @@ final class CoreDataCache {
 
     func saveContracts(_ contracts: [Contract], ownerID: String) {
         context.perform {
-            // Delete old records for this owner so removed contracts disappear offline too
-            let delete: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "CachedContract")
+            let delete: NSFetchRequest<CachedContract> = CachedContract.fetchRequest()
             delete.predicate = NSPredicate(format: "ownerID == %@", ownerID)
-            try? self.context.execute(NSBatchDeleteRequest(fetchRequest: delete))
+            (try? self.context.fetch(delete))?.forEach { self.context.delete($0) }
 
             for c in contracts {
                 let cached           = CachedContract(context: self.context)
@@ -118,9 +117,9 @@ final class CoreDataCache {
 
     func saveBids(_ bids: [Bid], ownerID: String) {
         context.perform {
-            let delete: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "CachedBid")
+            let delete: NSFetchRequest<CachedBid> = CachedBid.fetchRequest()
             delete.predicate = NSPredicate(format: "ownerID == %@", ownerID)
-            try? self.context.execute(NSBatchDeleteRequest(fetchRequest: delete))
+            (try? self.context.fetch(delete))?.forEach { self.context.delete($0) }
 
             for b in bids {
                 let cached          = CachedBid(context: self.context)
@@ -167,9 +166,9 @@ final class CoreDataCache {
 
     func saveOffers(_ offers: [Offer], ownerID: String) {
         context.perform {
-            let delete: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "CachedOffer")
+            let delete: NSFetchRequest<CachedOffer> = CachedOffer.fetchRequest()
             delete.predicate = NSPredicate(format: "ownerID == %@", ownerID)
-            try? self.context.execute(NSBatchDeleteRequest(fetchRequest: delete))
+            (try? self.context.fetch(delete))?.forEach { self.context.delete($0) }
 
             for o in offers {
                 let cached            = CachedOffer(context: self.context)
@@ -218,9 +217,9 @@ final class CoreDataCache {
 
     func saveTransactions(_ transactions: [Transaction], ownerID: String) {
         context.perform {
-            let delete: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "CachedTransaction")
+            let delete: NSFetchRequest<CachedTransaction> = CachedTransaction.fetchRequest()
             delete.predicate = NSPredicate(format: "ownerID == %@", ownerID)
-            try? self.context.execute(NSBatchDeleteRequest(fetchRequest: delete))
+            (try? self.context.fetch(delete))?.forEach { self.context.delete($0) }
 
             for t in transactions {
                 let cached             = CachedTransaction(context: self.context)

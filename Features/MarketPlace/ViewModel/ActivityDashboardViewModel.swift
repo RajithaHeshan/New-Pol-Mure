@@ -15,22 +15,22 @@ class ActivityDashboardViewModel {
 
     var selectedTab: Int = 0
 
-    // MARK: - Tab 0: Bids placed by this buyer
+   
     var myBids: [Bid] = []
 
-    // MARK: - Tab 1: Offers pitched TO this buyer by sellers
+   
     var incomingOffers: [Offer] = []
 
-    // MARK: - Tab 2: Financial transactions for this buyer
+
     var transactions: [Transaction] = []
 
-    // MARK: - Tab 3: Contracts involving this buyer
+  
     var contracts: [Contract] = []
 
-    // MARK: - Highest bid per sellerID — drives winning/outbid status in tab 0
+  
     var highestBidPerSeller: [String: Double] = [:]
 
-    // MARK: - Loading States
+  
     var isLoadingBids         = false
     var isLoadingOffers       = false
     var isLoadingTransactions = false
@@ -43,11 +43,12 @@ class ActivityDashboardViewModel {
     private let transactionsListenerBox = ActivityListenerBox()
     private let contractsListenerBox    = ActivityListenerBox()
 
-    // All bids listener to derive highest-per-seller winning status
+  
     private let allBidsListenerBox = ActivityListenerBox()
 
     init() {
         self.currentBuyerID = AuthManager.shared.currentUserID
+        loadCachedData()
         attachBidsListener()
         attachAllBidsListener()
         attachOffersListener()
@@ -55,7 +56,22 @@ class ActivityDashboardViewModel {
         attachContractsListener()
     }
 
-    // MARK: - Tab 0: My Bids Listener
+    private func loadCachedData() {
+        guard !currentBuyerID.isEmpty else { return }
+        let cache = CoreDataCache.shared
+        let cachedBids = cache.loadBids(ownerID: currentBuyerID)
+        if !cachedBids.isEmpty { myBids = cachedBids }
+        let cachedOffers = cache.loadOffers(ownerID: currentBuyerID)
+        if !cachedOffers.isEmpty { incomingOffers = cachedOffers }
+        let cachedTx = cache.loadTransactions(ownerID: currentBuyerID)
+        if !cachedTx.isEmpty { transactions = cachedTx }
+        let cachedContracts = cache.loadContracts(ownerID: currentBuyerID)
+        if !cachedContracts.isEmpty { contracts = cachedContracts }
+     // TEMPORARY — remove after testing
+    print("📦 CoreData loaded: bids=\(cachedBids.count) offers=\(cachedOffers.count) tx=\(cachedTx.count) contracts=\(cachedContracts.count)")
+    }
+
+  
     private func attachBidsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingBids = true
@@ -76,11 +92,12 @@ class ActivityDashboardViewModel {
                     Bid(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
+                CoreDataCache.shared.saveBids(self.myBids, ownerID: self.currentBuyerID)
                 self.isLoadingBids = false
             }
     }
 
-    // MARK: - All Bids Listener (derives highest bid per seller for winning status)
+  
     private func attachAllBidsListener() {
         allBidsListenerBox.listener = Firestore.firestore()
             .collection("bids")
@@ -103,13 +120,13 @@ class ActivityDashboardViewModel {
             }
     }
 
-    // MARK: - Winning Status Helper
+   
     func isWinning(bid: Bid) -> Bool {
         guard let highest = highestBidPerSeller[bid.sellerID] else { return false }
         return bid.amount >= highest
     }
 
-    // MARK: - Tab 1: Incoming Offers Listener (sellers pitching to this buyer)
+  
     private func attachOffersListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingOffers = true
@@ -130,7 +147,7 @@ class ActivityDashboardViewModel {
                     Offer(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
-                // Fire notification only for genuinely new pending offers (not on first load)
+                
                 if !self.incomingOffers.isEmpty {
                     let existingIDs = Set(self.incomingOffers.map { $0.id })
                     for offer in updated where !existingIDs.contains(offer.id) && offer.status == "pending" {
@@ -139,25 +156,26 @@ class ActivityDashboardViewModel {
                 }
 
                 self.incomingOffers = updated
+                CoreDataCache.shared.saveOffers(updated, ownerID: self.currentBuyerID)
                 self.isLoadingOffers = false
             }
     }
 
-    // MARK: - Accept Offer → creates a Contract and marks offer accepted
+ 
     func acceptOffer(_ offer: Offer) {
         let db = Firestore.firestore()
 
         Task {
             do {
-                // Mark the offer as accepted
+               
                 try await db.collection("offers").document(offer.id)
                     .updateData(["status": "accepted"])
 
-                // Fetch buyer name for the contract record
+               
                 let buyerDoc   = try? await db.collection("users").document(currentBuyerID).getDocument()
                 let buyerName  = buyerDoc?.data()?["fullName"] as? String ?? ""
 
-                // Fetch seller profile for quantity and location
+               
                 let sellerDoc = try? await db.collection("users").document(offer.sellerID).getDocument()
 
                 let contractRef = "#\(Int.random(in: 1000...9999))"
@@ -184,7 +202,7 @@ class ActivityDashboardViewModel {
         }
     }
 
-    // MARK: - Decline Offer → marks offer declined
+ 
     func declineOffer(_ offer: Offer) {
         Task {
             do {
@@ -198,7 +216,7 @@ class ActivityDashboardViewModel {
         }
     }
 
-    // MARK: - Local Push Notification (Inbound Offer Alert for Buyer)
+  
     private func scheduleNewOfferNotification(offer: Offer) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
@@ -221,7 +239,7 @@ class ActivityDashboardViewModel {
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
-    // MARK: - Tab 2: Transactions Listener
+
     private func attachTransactionsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingTransactions = true
@@ -243,11 +261,12 @@ class ActivityDashboardViewModel {
                     Transaction(id: $0.documentID, data: $0.data())
                 }.sorted { $0.completedAt > $1.completedAt } ?? []
 
+                CoreDataCache.shared.saveTransactions(self.transactions, ownerID: self.currentBuyerID)
                 self.isLoadingTransactions = false
             }
     }
 
-    // MARK: - Tab 3: Contracts Listener
+  
     private func attachContractsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingContracts = true
@@ -268,11 +287,12 @@ class ActivityDashboardViewModel {
                     Contract(id: $0.documentID, data: $0.data())
                 }.sorted { $0.createdAt > $1.createdAt } ?? []
 
+                CoreDataCache.shared.saveContracts(self.contracts, ownerID: self.currentBuyerID)
                 self.isLoadingContracts = false
             }
     }
 
-    // MARK: - Date Formatter Helper
+   
     func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -280,7 +300,7 @@ class ActivityDashboardViewModel {
         return formatter.string(from: date)
     }
 
-    // MARK: - Contract Status Display Helper
+ 
     func statusDisplayText(_ status: String) -> String {
         switch status {
         case "escrow":      return "Escrow Held"

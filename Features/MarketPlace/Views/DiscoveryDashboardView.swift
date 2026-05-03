@@ -38,7 +38,7 @@ struct DiscoveryDashboardView: View {
         }
     }
 
-    // MARK: - Spend Banner
+  
     private var spendBannerSection: some View {
         NavigationLink(destination: BuyerPerformanceView()) {
             HStack {
