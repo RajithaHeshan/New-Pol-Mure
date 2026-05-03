@@ -1,6 +1,9 @@
 import SwiftUI
 import MapKit
 
+// Apple HIG minimum tap target: 44×44 points
+private let kMinTapSize: CGFloat = 44
+
 // MARK: - Account Root
 struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -9,8 +12,6 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
 
     private var accentColor: Color { viewModel.isSeller ? .green : .blue }
-
-    // High Contrast: increase border width when contrast is elevated
     private var avatarBorderWidth: CGFloat { contrast == .increased ? 4 : 2.5 }
 
     var body: some View {
@@ -28,6 +29,9 @@ struct ProfileView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Done") { dismiss() }
                         .foregroundColor(accentColor)
+                        // Minimum tap target: ensure Done button is at least 44pt tall
+                        .frame(minWidth: kMinTapSize, minHeight: kMinTapSize)
+                        .contentShape(Rectangle())
                         .accessibilityLabel("Done")
                         .accessibilityHint("Closes the Account screen")
                 }
@@ -50,7 +54,7 @@ struct ProfileView: View {
             ProgressView()
                 .accessibilityLabel("Loading account information")
             Text("Loading account...")
-                .font(.subheadline)          // Dynamic Type: scales automatically
+                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .accessibilityHidden(true)
         }
@@ -62,7 +66,6 @@ struct ProfileView: View {
         List {
             // MARK: Avatar Header
             Section {
-                // Dynamic Type: switch to vertical layout at accessibility sizes
                 if typeSize.isAccessibilitySize {
                     VStack(spacing: 12) {
                         avatarImage
@@ -90,6 +93,7 @@ struct ProfileView: View {
 
             // MARK: Account Section
             Section {
+                // Each NavigationLink row has .frame(minHeight: 44) via accountRow padding
                 NavigationLink(destination: PersonalInfoEditView(viewModel: viewModel)) {
                     accountRow(icon: "person.fill", iconColor: .blue,
                                title: "Personal Information",
@@ -162,7 +166,7 @@ struct ProfileView: View {
                     )
                 }
             } header: {
-                Text("Account")                // Dynamic Type: section headers scale automatically
+                Text("Account")
             }
 
             // MARK: Sign Out
@@ -175,10 +179,13 @@ struct ProfileView: View {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                             .accessibilityHidden(true)
                         Text("Sign Out")
-                            .font(.body)       // Dynamic Type: scales automatically
+                            .font(.body)
                             .fontWeight(.medium)
                     }
                     .foregroundColor(.red)
+                    // Minimum tap target: full-width, at least 44pt tall
+                    .frame(maxWidth: .infinity, minHeight: kMinTapSize, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Sign Out")
                 .accessibilityHint("Signs you out of your account")
@@ -187,20 +194,14 @@ struct ProfileView: View {
         .listStyle(.insetGrouped)
     }
 
-    // MARK: - Avatar Image (extracted for reuse in both layout branches)
+    // MARK: - Avatar Image
     private var avatarImage: some View {
         Image(viewModel.profileImageName.isEmpty ? "person.circle" : viewModel.profileImageName)
             .resizable()
             .scaledToFill()
             .frame(width: 72, height: 72)
             .clipShape(Circle())
-            // High Contrast: thicker border, full-opacity shadow removed
-            .overlay(
-                Circle().stroke(
-                    contrast == .increased ? accentColor : accentColor,
-                    lineWidth: avatarBorderWidth
-                )
-            )
+            .overlay(Circle().stroke(accentColor, lineWidth: avatarBorderWidth))
             .shadow(
                 color: contrast == .increased ? .clear : accentColor.opacity(0.25),
                 radius: contrast == .increased ? 0 : 6
@@ -212,28 +213,25 @@ struct ProfileView: View {
     private var headerTextStack: some View {
         VStack(spacing: 6) {
             Text(viewModel.fullName.isEmpty ? "Your Name" : viewModel.fullName)
-                .font(.title3.bold())          // Dynamic Type: scales automatically
+                .font(.title3.bold())
                 .multilineTextAlignment(.center)
 
             Text(viewModel.email)
-                .font(.subheadline)            // Dynamic Type: scales automatically
+                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
 
             Text(viewModel.isSeller ? "Seller Account" : "Buyer Account")
-                .font(.caption.bold())         // Dynamic Type: scales automatically
-                // High Contrast: use full opacity color instead of tinted background
-                .foregroundColor(contrast == .increased ? .primary : accentColor)
+                .font(.caption.bold())
+                .foregroundColor(contrast == .increased ? .white : accentColor)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 4)
                 .background(
                     contrast == .increased
-                        ? AnyShapeStyle(accentColor)           // solid background for contrast
+                        ? AnyShapeStyle(accentColor)
                         : AnyShapeStyle(accentColor.opacity(0.1))
                 )
-                .foregroundColor(contrast == .increased ? .white : accentColor)
                 .clipShape(Capsule())
-                // High Contrast: add a border around the badge
                 .overlay(
                     contrast == .increased
                         ? AnyView(Capsule().stroke(accentColor, lineWidth: 1.5))
@@ -249,8 +247,8 @@ struct ProfileView: View {
     }
 
     // MARK: - Reusable Account Row
+    // minHeight: 44 ensures every row meets the HIG minimum tap target
     private func accountRow(icon: String, iconColor: Color, title: String, subtitle: String) -> some View {
-        // Dynamic Type: at accessibility sizes stack vertically instead of side by side
         Group {
             if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 6) {
@@ -260,30 +258,33 @@ struct ProfileView: View {
                             .font(.body)
                             .foregroundColor(.primary)
                         Text(subtitle)
-                            .font(.subheadline)   // larger than caption at accessibility sizes
+                            .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                 }
+                .frame(maxWidth: .infinity, minHeight: kMinTapSize, alignment: .leading)
+                .contentShape(Rectangle())
                 .padding(.vertical, 6)
             } else {
                 HStack(spacing: 14) {
                     iconBadge(icon: icon, iconColor: iconColor)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
-                            .font(.body)          // Dynamic Type: scales automatically
+                            .font(.body)
                             .foregroundColor(.primary)
                         Text(subtitle)
-                            .font(.caption)       // Dynamic Type: scales automatically
+                            .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                     }
                 }
+                .frame(maxWidth: .infinity, minHeight: kMinTapSize, alignment: .leading)
+                .contentShape(Rectangle())
                 .padding(.vertical, 4)
             }
         }
     }
 
-    // Icon badge extracted so both layout branches share it
     private func iconBadge(icon: String, iconColor: Color) -> some View {
         Image(systemName: icon)
             .font(.system(size: 13, weight: .semibold))
@@ -291,7 +292,6 @@ struct ProfileView: View {
             .frame(width: 30, height: 30)
             .background(iconColor)
             .cornerRadius(7)
-            // High Contrast: add a visible border around the icon badge
             .overlay(
                 contrast == .increased
                     ? AnyView(RoundedRectangle(cornerRadius: 7).stroke(iconColor, lineWidth: 1.5))
@@ -312,11 +312,12 @@ struct PersonalInfoEditView: View {
     var body: some View {
         List {
             Section {
-                // Dynamic Type: stack label above field at accessibility sizes
                 editRow(icon: "person.fill", label: "Full Name", typeSize: typeSize) {
                     TextField("Enter your name", text: $viewModel.fullName)
                         .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
                         .textContentType(.name)
+                        // Minimum tap target on the text field itself
+                        .frame(minHeight: kMinTapSize)
                         .accessibilityLabel("Full Name")
                         .accessibilityValue(viewModel.fullName.isEmpty ? "Not set" : viewModel.fullName)
                         .accessibilityHint("Enter your full name")
@@ -327,13 +328,13 @@ struct PersonalInfoEditView: View {
                         .multilineTextAlignment(typeSize.isAccessibilitySize ? .leading : .trailing)
                         .keyboardType(.phonePad)
                         .textContentType(.telephoneNumber)
+                        .frame(minHeight: kMinTapSize)
                         .accessibilityLabel("Phone number")
                         .accessibilityValue(viewModel.phone.isEmpty ? "Not set" : viewModel.phone)
                         .accessibilityHint("Enter your contact phone number")
                 }
 
                 // Email — read only
-                // High Contrast: show a visible border to distinguish read-only field
                 HStack {
                     Label("Email", systemImage: "envelope.fill")
                         .foregroundColor(.secondary)
@@ -344,6 +345,8 @@ struct PersonalInfoEditView: View {
                         .foregroundColor(.secondary)
                         .font(.subheadline)
                 }
+                // Minimum tap target: 44pt tall even though it is read-only
+                .frame(minHeight: kMinTapSize)
                 .padding(contrast == .increased ? 6 : 0)
                 .background(
                     contrast == .increased
@@ -358,7 +361,7 @@ struct PersonalInfoEditView: View {
 
             } footer: {
                 Text("Email cannot be changed.")
-                    .font(.footnote)           // Dynamic Type: scales automatically
+                    .font(.footnote)
                     .accessibilityHidden(true)
             }
         }
@@ -374,6 +377,9 @@ struct PersonalInfoEditView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(accentColor)
                 .disabled(viewModel.isSaving)
+                // Minimum tap target on Save button
+                .frame(minWidth: kMinTapSize, minHeight: kMinTapSize)
+                .contentShape(Rectangle())
                 .accessibilityLabel("Save")
                 .accessibilityHint("Saves your updated name and phone number")
             }
@@ -394,7 +400,6 @@ struct SellerProductionEditView: View {
     var body: some View {
         List {
             Section {
-                // Dynamic Type: stack at accessibility sizes
                 if typeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Yield / Harvest")
@@ -404,6 +409,7 @@ struct SellerProductionEditView: View {
                             TextField("e.g. 10000", text: $viewModel.typicalYield)
                                 .keyboardType(.numberPad)
                                 .foregroundColor(.green)
+                                .frame(minHeight: kMinTapSize)
                                 .accessibilityLabel("Typical yield")
                                 .accessibilityValue(viewModel.typicalYield.isEmpty ? "Not set" : "\(viewModel.typicalYield) nuts")
                                 .accessibilityHint("Enter the number of coconuts you typically harvest")
@@ -423,13 +429,14 @@ struct SellerProductionEditView: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(.green)
-                            .frame(width: 80)
+                            .frame(width: 80, height: kMinTapSize)
                             .accessibilityLabel("Typical yield")
                             .accessibilityValue(viewModel.typicalYield.isEmpty ? "Not set" : "\(viewModel.typicalYield) nuts")
                             .accessibilityHint("Enter the number of coconuts you typically harvest")
                         Text("Nuts").foregroundColor(.secondary).font(.subheadline)
                             .accessibilityHidden(true)
                     }
+                    .frame(minHeight: kMinTapSize)
                 }
 
                 DatePicker(
@@ -438,6 +445,8 @@ struct SellerProductionEditView: View {
                     displayedComponents: .date
                 )
                 .tint(.green)
+                // DatePicker is already 44pt tall — ensure it with minHeight
+                .frame(minHeight: kMinTapSize)
                 .accessibilityLabel("Next harvest date")
                 .accessibilityValue(viewModel.nextHarvestDate.formatted(date: .abbreviated, time: .omitted))
                 .accessibilityHint("Select the expected date of your next coconut harvest")
@@ -448,6 +457,8 @@ struct SellerProductionEditView: View {
                     }
                 }
                 .tint(.green)
+                // Picker row minimum tap target
+                .frame(minHeight: kMinTapSize)
                 .accessibilityLabel("Certification level")
                 .accessibilityValue(viewModel.certificationLevel)
                 .accessibilityHint("Select the certification level that applies to your produce")
@@ -465,6 +476,8 @@ struct SellerProductionEditView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.green)
                     .disabled(viewModel.isSaving)
+                    .frame(minWidth: kMinTapSize, minHeight: kMinTapSize)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Save")
                     .accessibilityHint("Saves yield, harvest date, and certification details")
             }
@@ -491,11 +504,11 @@ struct BuyerBusinessEditView: View {
                     }
                 }
                 .tint(.blue)
+                .frame(minHeight: kMinTapSize)
                 .accessibilityLabel("Business type")
                 .accessibilityValue(viewModel.businessType.isEmpty ? "Not selected" : viewModel.businessType)
                 .accessibilityHint("Select the category that best describes your business")
 
-                // Dynamic Type: stack at accessibility sizes
                 if typeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Typical Volume")
@@ -505,6 +518,7 @@ struct BuyerBusinessEditView: View {
                             TextField("e.g. 5000", text: $viewModel.typicalVolume)
                                 .keyboardType(.numberPad)
                                 .foregroundColor(.blue)
+                                .frame(minHeight: kMinTapSize)
                                 .accessibilityLabel("Typical purchase volume")
                                 .accessibilityValue(viewModel.typicalVolume.isEmpty ? "Not set" : "\(viewModel.typicalVolume) nuts")
                                 .accessibilityHint("Enter the number of coconuts you typically buy per order")
@@ -524,13 +538,14 @@ struct BuyerBusinessEditView: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(.blue)
-                            .frame(width: 80)
+                            .frame(width: 80, height: kMinTapSize)
                             .accessibilityLabel("Typical purchase volume")
                             .accessibilityValue(viewModel.typicalVolume.isEmpty ? "Not set" : "\(viewModel.typicalVolume) nuts")
                             .accessibilityHint("Enter the number of coconuts you typically buy per order")
                         Text("Nuts").foregroundColor(.secondary).font(.subheadline)
                             .accessibilityHidden(true)
                     }
+                    .frame(minHeight: kMinTapSize)
                 }
             } header: {
                 Text("Business Information")
@@ -545,6 +560,8 @@ struct BuyerBusinessEditView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.blue)
                     .disabled(viewModel.isSaving)
+                    .frame(minWidth: kMinTapSize, minHeight: kMinTapSize)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Save")
                     .accessibilityHint("Saves your business type and typical purchase volume")
             }
@@ -573,6 +590,7 @@ struct LocationEditView: View {
     var body: some View {
         List {
             Section {
+                // Map preview
                 ZStack {
                     Map(position: $cameraPosition, interactionModes: []) {
                         MapCircle(center: viewModel.coordinate, radius: 2000)
@@ -583,13 +601,14 @@ struct LocationEditView: View {
                     }
                     .frame(height: 180)
                     .clipShape(RoundedRectangle(cornerRadius: 10))
-                    // High Contrast: add a visible border around the map
                     .overlay(
                         contrast == .increased
                             ? AnyView(RoundedRectangle(cornerRadius: 10).stroke(accentColor, lineWidth: 2))
                             : AnyView(EmptyView())
                     )
+                    // Transparent tap target — minimum 44pt enforced by the 180pt frame
                     Button(action: { viewModel.isMapPresented = true }) { Color.clear }
+                        .contentShape(Rectangle())
                 }
                 .listRowInsets(EdgeInsets())
                 .accessibilityElement(children: .ignore)
@@ -605,24 +624,24 @@ struct LocationEditView: View {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(accentColor)
-                            .frame(width: 30, height: 30)
+                            // Minimum tap target: 44×44 for the expand button
+                            .frame(width: kMinTapSize, height: kMinTapSize)
                             .background(Color(UIColor.systemBackground))
                             .clipShape(Circle())
                             .shadow(radius: contrast == .increased ? 0 : 2)
-                            // High Contrast: border on expand button
                             .overlay(
                                 contrast == .increased
                                     ? AnyView(Circle().stroke(accentColor, lineWidth: 1.5))
                                     : AnyView(EmptyView())
                             )
                     }
-                    .padding(10)
+                    .contentShape(Circle())
+                    .padding(6)
                     .buttonStyle(PlainButtonStyle())
                     .accessibilityHidden(true)
                 }
 
-                // Selected location row
-                // High Contrast: bold the location name for better readability
+                // Selected location display
                 HStack {
                     Label("Selected Zone", systemImage: "location.fill")
                         .foregroundColor(.secondary)
@@ -630,16 +649,15 @@ struct LocationEditView: View {
                         .accessibilityHidden(true)
                     Spacer()
                     Text(viewModel.locationName.isEmpty ? "Not set" : viewModel.locationName)
-                        .font(contrast == .increased ? .subheadline.bold() : .subheadline.bold())
-                        .foregroundColor(contrast == .increased ? .primary : .primary)
+                        .font(.subheadline.bold())
                         .multilineTextAlignment(.trailing)
                 }
+                .frame(minHeight: kMinTapSize)
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Selected location")
                 .accessibilityValue(viewModel.locationName.isEmpty ? "Not set" : viewModel.locationName)
 
-                // Change Location button
-                // High Contrast: solid background instead of text-only button
+                // Change Location button — minimum 44pt tall, full width tappable
                 Button(action: { viewModel.isMapPresented = true }) {
                     HStack {
                         Spacer()
@@ -648,7 +666,8 @@ struct LocationEditView: View {
                             .foregroundColor(contrast == .increased ? .white : accentColor)
                         Spacer()
                     }
-                    .padding(.vertical, contrast == .increased ? 10 : 0)
+                    // Minimum tap target: full width, at least 44pt tall
+                    .frame(maxWidth: .infinity, minHeight: kMinTapSize)
                     .background(
                         contrast == .increased
                             ? AnyShapeStyle(accentColor)
@@ -656,6 +675,7 @@ struct LocationEditView: View {
                     )
                     .cornerRadius(contrast == .increased ? 8 : 0)
                 }
+                .contentShape(Rectangle())
                 .accessibilityLabel("Change location")
                 .accessibilityHint("Opens the full map to pick a new \(locationKind)")
 
@@ -672,6 +692,8 @@ struct LocationEditView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(accentColor)
                     .disabled(viewModel.isSaving)
+                    .frame(minWidth: kMinTapSize, minHeight: kMinTapSize)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Save")
                     .accessibilityHint("Saves the selected \(locationKind) location")
             }
@@ -702,7 +724,6 @@ struct LocationEditView: View {
 }
 
 // MARK: - Shared helper row builder
-// Dynamic Type: stacks label above input at accessibility sizes
 private func editRow<Content: View>(
     icon: String,
     label: String,
@@ -724,6 +745,9 @@ private func editRow<Content: View>(
                 trailing()
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+            // Minimum tap target for the whole stacked row
+            .frame(maxWidth: .infinity, minHeight: kMinTapSize, alignment: .leading)
+            .contentShape(Rectangle())
             .padding(.vertical, 6)
         } else {
             HStack(spacing: 10) {
@@ -733,11 +757,14 @@ private func editRow<Content: View>(
                     .frame(width: 20)
                     .accessibilityHidden(true)
                 Text(label)
-                    .font(.subheadline)    // Dynamic Type: scales automatically
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
                 Spacer()
                 trailing()
             }
+            // Minimum tap target: full width, at least 44pt tall
+            .frame(maxWidth: .infinity, minHeight: kMinTapSize)
+            .contentShape(Rectangle())
             .padding(.vertical, 4)
         }
     }
@@ -751,7 +778,7 @@ private func saveSuccessOverlay(accentColor: Color) -> some View {
             .foregroundColor(accentColor)
             .accessibilityHidden(true)
         Text("Saved")
-            .font(.title2.bold())          // Dynamic Type: scales automatically
+            .font(.title2.bold())
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(.ultraThinMaterial)
