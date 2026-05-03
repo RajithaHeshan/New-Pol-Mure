@@ -105,7 +105,8 @@ struct SellerActivityDashboardView: View {
                                         SellerContractRow(
                                             contractNumber: contract.contractRef,
                                             partnerName: contract.buyerName,
-                                            status: viewModel.statusDisplayText(contract.status)
+                                            status: contract.status,
+                                            createdAt: contract.createdAt
                                         )
                                     }
                                     .buttonStyle(PlainButtonStyle())
@@ -362,32 +363,67 @@ struct SellerContractRow: View {
     let contractNumber: String
     let partnerName: String
     let status: String
+    let createdAt: Date
+
+    private var statusColor: Color {
+        switch status {
+        case "completed":                       return .green
+        case "escrow":                          return .orange
+        case "inspection", "qualityApproved":  return .blue
+        case "dispute":                         return .red
+        case "rejected":                        return .gray
+        default:                                return .orange
+        }
+    }
+
+    private var statusLabel: String {
+        switch status {
+        case "escrow":           return "Escrow Held"
+        case "inspection":       return "Inspection Pending"
+        case "qualityApproved":  return "Quality Approved"
+        case "completed":        return "Completed"
+        case "rejected":         return "Rejected"
+        case "dispute":          return "Disputed"
+        default:                 return status.capitalized
+        }
+    }
+
+    private var formattedDate: String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: createdAt)
+    }
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Contract \(contractNumber)")
-                    .font(.headline)
                 Text(partnerName)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .font(.headline)
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(formattedDate)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
-                Text(status)
+                Text(statusLabel)
                     .font(.caption.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.1))
-                    .foregroundColor(.orange)
+                    .background(statusColor.opacity(0.12))
+                    .foregroundColor(statusColor)
                     .clipShape(Capsule())
-
-                HStack {
+                HStack(spacing: 2) {
                     Text("View Logistics")
                         .font(.caption.bold())
                         .foregroundColor(.orange)
                     Image(systemName: "chevron.right")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundColor(.orange)
                 }
             }
