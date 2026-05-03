@@ -34,6 +34,7 @@
     <entity name="CachedBid" representedClassName="CachedBid" syncable="YES" codeGenerationType="class">
         <attribute name="id" optional="YES" attributeType="String"/>
         <attribute name="sellerID" optional="YES" attributeType="String"/>
+        <attribute name="sellerName" optional="YES" attributeType="String"/>
         <attribute name="bidderID" optional="YES" attributeType="String"/>
         <attribute name="bidderName" optional="YES" attributeType="String"/>
         <attribute name="harvestID" optional="YES" attributeType="String"/>

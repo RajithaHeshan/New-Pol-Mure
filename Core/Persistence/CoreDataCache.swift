@@ -125,6 +125,7 @@ final class CoreDataCache {
                 let cached          = CachedBid(context: self.context)
                 cached.id           = b.id
                 cached.sellerID     = b.sellerID
+                cached.sellerName   = b.sellerName
                 cached.bidderID     = b.bidderID
                 cached.bidderName   = b.bidderName
                 cached.harvestID    = b.harvestID
@@ -152,6 +153,7 @@ final class CoreDataCache {
             else { return nil }
             return Bid(id: id, data: [
                 "sellerID":   sellerID,
+                "sellerName": cached.sellerName ?? "",
                 "bidderID":   bidderID,
                 "bidderName": bidderName,
                 "harvestID":  cached.harvestID ?? "",

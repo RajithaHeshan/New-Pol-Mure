@@ -88,13 +88,55 @@ class ActivityDashboardViewModel {
                     return
                 }
 
-                self.myBids = snapshot?.documents.compactMap {
+                let bids = snapshot?.documents.compactMap {
                     Bid(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
-                CoreDataCache.shared.saveBids(self.myBids, ownerID: self.currentBuyerID)
-                self.isLoadingBids = false
+                Task {
+                    self.myBids = await self.resolveSellerNames(for: bids)
+                    CoreDataCache.shared.saveBids(self.myBids, ownerID: self.currentBuyerID)
+                    self.isLoadingBids = false
+                }
             }
+    }
+
+    // For bids that have no sellerName stored (placed before this update),
+    // fetch the seller's fullName from Firestore once and patch it in.
+    private func resolveSellerNames(for bids: [Bid]) async -> [Bid] {
+        let db = Firestore.firestore()
+        // Collect unique sellerIDs that need a name lookup
+        let needsLookup = Set(bids.filter { $0.sellerName.isEmpty && !$0.sellerID.isEmpty }.map { $0.sellerID })
+        guard !needsLookup.isEmpty else { return bids }
+
+        // Fetch all missing names in parallel
+        var nameMap: [String: String] = [:]
+        await withTaskGroup(of: (String, String).self) { group in
+            for sellerID in needsLookup {
+                group.addTask {
+                    let doc = try? await db.collection("users").document(sellerID).getDocument()
+                    let name = doc?.data()?["fullName"] as? String ?? ""
+                    return (sellerID, name)
+                }
+            }
+            for await (sellerID, name) in group {
+                nameMap[sellerID] = name
+            }
+        }
+
+        // Rebuild bids with resolved names
+        return bids.map { bid in
+            guard bid.sellerName.isEmpty, let resolvedName = nameMap[bid.sellerID] else { return bid }
+            return Bid(id: bid.id, data: [
+                "sellerID":   bid.sellerID,
+                "sellerName": resolvedName,
+                "bidderID":   bid.bidderID,
+                "bidderName": bid.bidderName,
+                "harvestID":  bid.harvestID,
+                "amount":     bid.amount,
+                "status":     bid.status,
+                "placedAt":   Timestamp(date: bid.placedAt)
+            ]) ?? bid
+        }
     }
 
   

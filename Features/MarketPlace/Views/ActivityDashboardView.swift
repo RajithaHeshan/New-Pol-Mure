@@ -33,7 +33,8 @@ struct ActivityDashboardView: View {
                             } else {
                                 ForEach(viewModel.myBids) { bid in
                                     PendingBidRow(
-                                        estateName: bid.sellerID,
+                                        sellerName: bid.sellerName.isEmpty ? "Seller" : bid.sellerName,
+                                        placedAt: bid.placedAt,
                                         currentBid: bid.amount,
                                         isWinning: viewModel.isWinning(bid: bid)
                                     )
@@ -145,16 +146,27 @@ struct EmptyActivityView: View {
 
 
 struct PendingBidRow: View {
-    let estateName: String
+    let sellerName: String
+    let placedAt: Date
     let currentBid: Double
     let isWinning: Bool
 
+    private var formattedDate: String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: placedAt)
+    }
+
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(estateName)
+                Text(sellerName)
                     .font(.headline)
-                HStack {
+                Text(formattedDate)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
                     Circle()
                         .fill(isWinning ? Color.green : Color.red)
                         .frame(width: 8, height: 8)
@@ -164,7 +176,7 @@ struct PendingBidRow: View {
                 }
             }
             Spacer()
-            VStack(alignment: .trailing) {
+            VStack(alignment: .trailing, spacing: 4) {
                 Text("My Bid")
                     .font(.caption)
                     .foregroundColor(.secondary)
