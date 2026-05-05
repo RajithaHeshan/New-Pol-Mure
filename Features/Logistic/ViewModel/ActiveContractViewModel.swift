@@ -43,7 +43,7 @@ class ActiveContractViewModel {
     // Persisted in Firestore — written when buyer confirms inspection date
     var inspectionDate: Date = Date().addingTimeInterval(86400)
 
-    // MARK: - Date Picker State (buyer chooses before revealing location)
+    // MARK: - Date Picker eventkit 
     var showDatePicker        = false
     var pendingPickerDate:    Date         = Date().addingTimeInterval(3600)   // default: 1 hour from now
     // Reminder offset in seconds — buyer selects how far ahead to be notified

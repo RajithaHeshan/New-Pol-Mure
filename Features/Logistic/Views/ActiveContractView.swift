@@ -546,7 +546,7 @@ private struct EscrowSummaryCard: View {
     }
 }
 
-// MARK: - Funds Locked Banner (shown after lock, before reveal)
+
 private struct FundsLockedBanner: View {
     var body: some View {
         HStack(spacing: 12) {

@@ -44,8 +44,8 @@ struct LoginView: View {
                         .padding(.horizontal, 24)
                         
                         VStack(spacing: 16) {
-                            
-                            // MARK: Updated Sign In Button
+
+                            // MARK: Sign In Button
                             PrimaryButton(title: "Sign In") {
                                 focusedField = nil
                                 viewModel.signInWithEmail { success, role, errorMsg in
@@ -57,15 +57,52 @@ struct LoginView: View {
                                     }
                                 }
                             }
-                            
+
+                            // MARK: Simulator Role Picker (Dev Only)
+                            // Select Buyer or Seller BEFORE tapping Face ID
                             VStack(spacing: 8) {
-                                Text("Simulator Routing (Dev Only)").font(.caption2).foregroundColor(.secondary)
+                                Text("Simulator Routing (Dev Only)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
                                 Picker("Simulate Role", selection: $viewModel.demoRoleSelection) {
                                     Text("Buyer Demo").tag("Buyer")
                                     Text("Seller Demo").tag("Seller")
                                 }
                                 .pickerStyle(SegmentedPickerStyle())
-                            }.padding(.top, 8)
+                            }
+                            .padding(.top, 4)
+
+                            // MARK: Face ID Button
+                            // Uses demoRoleSelection to decide which dashboard to open
+                            Button {
+                                viewModel.authenticateWithFaceID { success, errorMsg in
+                                    if success {
+                                        // Set role based on selected demo role
+                                        let role = viewModel.demoRoleSelection == "Buyer" ? "BUYER" : "SELLER"
+                                        self.userRole = role
+                                        self.isLoggedIn = true
+                                    } else {
+                                        viewModel.errorMessage = errorMsg
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "faceid")
+                                        .font(.system(size: 22, weight: .medium))
+                                    Text("Sign in with Face ID (\(viewModel.demoRoleSelection))")
+                                        .font(.body.bold())
+                                }
+                                .foregroundColor(.polmureEmerald)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(Color.polmureEmerald.opacity(0.1))
+                                .cornerRadius(14)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(Color.polmureEmerald.opacity(0.4), lineWidth: 1)
+                                )
+                            }
+                            .accessibilityLabel("Sign in with Face ID as \(viewModel.demoRoleSelection)")
+                            .accessibilityHint("Authenticates using Face ID then opens the \(viewModel.demoRoleSelection) dashboard")
                             
                             if !viewModel.errorMessage.isEmpty {
                                 Text(viewModel.errorMessage).font(.caption).foregroundColor(.red)
