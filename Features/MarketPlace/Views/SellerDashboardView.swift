@@ -12,6 +12,8 @@ struct SellerDashboardView: View {
                 VStack(spacing: 20) {
 
               
+                    greetingSection
+
                     HStack(spacing: 16) {
                         NavigationLink(destination: SellerPerformanceView()) {
                             MetricCard(
@@ -265,6 +267,31 @@ struct SellerDashboardView: View {
             .navigationDestination(item: $navigateToContract) { contract in
                 SellerContractView(contract: contract)
             }
+        }
+    }
+}
+
+extension SellerDashboardView {
+    private var greetingSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(greetingText)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Text(viewModel.fullName.isEmpty ? "Welcome!" : "Hi, \(viewModel.fullName) 👋")
+                .font(.title2.bold())
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal)
+        .padding(.top, 10)
+    }
+
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12:  return "Good Morning"
+        case 12..<17: return "Good Afternoon"
+        case 17..<21: return "Good Evening"
+        default:      return "Good Night"
         }
     }
 }

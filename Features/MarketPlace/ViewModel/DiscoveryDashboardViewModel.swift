@@ -21,6 +21,7 @@ class DiscoveryDashboardViewModel {
 
    
     var profileImageName: String = "Gemini_Generated_Image_l5uvm3l5uvm3l5uv"
+    var fullName: String = ""
 
    
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609) // Default: Kurunegala
@@ -83,6 +84,9 @@ class DiscoveryDashboardViewModel {
 
                 if let imageName = data["profileImageName"] as? String {
                     self.profileImageName = imageName
+                }
+                if let name = data["fullName"] as? String {
+                    self.fullName = name
                 }
 
                 // Decode buyer profile for ML scoring

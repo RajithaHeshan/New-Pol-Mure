@@ -25,6 +25,7 @@ class SellerDashboardViewModel {
 
 
     var profileImageName: String = "Gemini_Generated_Image_bvc5lzbvc5lzbvc5"
+    var fullName: String = ""
 
 
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
@@ -213,6 +214,9 @@ class SellerDashboardViewModel {
 
                 if let imageName = data["profileImageName"] as? String {
                     self.profileImageName = imageName
+                }
+                if let name = data["fullName"] as? String {
+                    self.fullName = name
                 }
 
                 // Center map on seller's own estate location

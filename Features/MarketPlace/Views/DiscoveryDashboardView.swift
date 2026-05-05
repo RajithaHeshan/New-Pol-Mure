@@ -8,6 +8,7 @@ struct DiscoveryDashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    greetingSection
                     spendBannerSection
                     FilterChipsView(filters: viewModel.filters, selectedFilter: $viewModel.selectedFilter)
                     recommendedSection
@@ -64,6 +65,30 @@ struct DiscoveryDashboardView: View {
             .padding(.top, 10)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    // MARK: - Greeting
+    private var greetingSection: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(greetingText)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            Text(viewModel.fullName.isEmpty ? "Welcome!" : "Hi, \(viewModel.fullName) 👋")
+                .font(.title2.bold())
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal)
+        .padding(.top, 10)
+    }
+
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12:  return "Good Morning"
+        case 12..<17: return "Good Afternoon"
+        case 17..<21: return "Good Evening"
+        default:      return "Good Night"
+        }
     }
 
     // MARK: - Recommended
