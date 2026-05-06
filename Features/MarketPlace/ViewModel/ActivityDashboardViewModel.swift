@@ -56,6 +56,7 @@ class ActivityDashboardViewModel {
         attachContractsListener()
     }
 
+
     private func loadCachedData() {
         guard !currentBuyerID.isEmpty else { return }
         let cache = CoreDataCache.shared
@@ -70,6 +71,8 @@ class ActivityDashboardViewModel {
      // TEMPORARY — remove after testing
     print("📦 CoreData loaded: bids=\(cachedBids.count) offers=\(cachedOffers.count) tx=\(cachedTx.count) contracts=\(cachedContracts.count)")
     }
+
+
 
   
     private func attachBidsListener() {
@@ -100,8 +103,7 @@ class ActivityDashboardViewModel {
             }
     }
 
-    // For bids that have no sellerName stored (placed before this update),
-    // fetch the seller's fullName from Firestore once and patch it in.
+    
     private func resolveSellerNames(for bids: [Bid]) async -> [Bid] {
         let db = Firestore.firestore()
         // Collect unique sellerIDs that need a name lookup
@@ -110,7 +112,7 @@ class ActivityDashboardViewModel {
 
         // Fetch all missing names in parallel
         var nameMap: [String: String] = [:]
-        await withTaskGroup(of: (String, String).self) { group in
+        await withTaskGroup(of: (String, String).self) { group in  //ui fast even many bids. concurrent sellers
             for sellerID in needsLookup {
                 group.addTask {
                     let doc = try? await db.collection("users").document(sellerID).getDocument()
@@ -123,7 +125,9 @@ class ActivityDashboardViewModel {
             }
         }
 
-        // Rebuild bids with resolved names
+
+
+       
         return bids.map { bid in
             guard bid.sellerName.isEmpty, let resolvedName = nameMap[bid.sellerID] else { return bid }
             return Bid(id: bid.id, data: [
@@ -162,6 +166,7 @@ class ActivityDashboardViewModel {
             }
     }
 
+
    
     func isWinning(bid: Bid) -> Bool {
         guard let highest = highestBidPerSeller[bid.sellerID] else { return false }
@@ -175,7 +180,7 @@ class ActivityDashboardViewModel {
 
         offersListenerBox.listener = Firestore.firestore()
             .collection("offers")
-            .whereField("buyerID", isEqualTo: currentBuyerID)
+            .whereField("buyerID", isEqualTo: currentBuyerID) //related Buyerid
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -258,6 +263,36 @@ class ActivityDashboardViewModel {
         }
     }
 
+    // MARK: - Delete Bid (only pending/outbid — cannot delete accepted bids)
+    func deleteBid(_ bid: Bid) {
+        guard bid.status == "pending" else { return }
+        Task {
+            do {
+                try await Firestore.firestore().collection("bids").document(bid.id).delete()
+            } catch {
+                print("Delete bid error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Delete Transaction (local hide only — kept in Firestore for audit)
+    func deleteTransaction(at offsets: IndexSet) {
+        transactions.remove(atOffsets: offsets)
+        CoreDataCache.shared.saveTransactions(transactions, ownerID: currentBuyerID)
+    }
+
+    // MARK: - Delete Contract (only completed or rejected)
+    func deleteContract(_ contract: Contract) {
+        guard contract.status == "completed" || contract.status == "rejected" else { return }
+        Task {
+            do {
+                try await Firestore.firestore().collection("contracts").document(contract.id).delete()
+            } catch {
+                print("Delete contract error: \(error.localizedDescription)")
+            }
+        }
+    }
+
   
     private func scheduleNewOfferNotification(offer: Offer) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -308,7 +343,8 @@ class ActivityDashboardViewModel {
             }
     }
 
-  
+  //contract 
+
     private func attachContractsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingContracts = true

@@ -82,6 +82,11 @@ class AuthManager {
         return results?.first?.userId ?? Auth.auth().currentUser?.uid ?? ""
     }
 
+    // Called after Face ID succeeds — refreshes Core Data so currentUserID is valid
+    func refreshSession(userId: String, role: String) {
+        saveLocalSession(userId: userId, role: role)
+    }
+
     func signOut() {
         do { try Auth.auth().signOut() } catch { print("Error signing out: \(error.localizedDescription)") }
         let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "LocalSession")

@@ -22,6 +22,7 @@ struct DiscoveryDashboardView: View {
             .navigationTitle("Marketplace")
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search a town e.g. Kurunegala...")
             .overlay(alignment: .top) { locationSearchingOverlay }
+            .onAppear { viewModel.fetchUserProfile() }
             .toolbar { toolbarContent }
             .sheet(isPresented: $viewModel.showProfile) { profileSheet }
             .sheet(isPresented: $viewModel.showNotifications) { notificationsSheet }
@@ -47,7 +48,7 @@ struct DiscoveryDashboardView: View {
                     Text("Monthly Spend")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("Rs 145,000")
+                    Text(viewModel.monthlySpend > 0 ? "Rs \(viewModel.monthlySpend, specifier: "%.0f")" : "Rs 0")
                         .font(.headline.bold())
                         .foregroundColor(.primary)
                 }

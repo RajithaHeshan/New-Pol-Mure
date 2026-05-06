@@ -30,10 +30,7 @@ class SellerActivityDashboardViewModel {
     var contracts: [Contract] = []
 
     
-    var lowestOfferPerBuyer: [String: Double] = [:]
-
-    // MARK: - Urgent buyer IDs — cross-referenced from urgentRequests collection
-    var urgentBuyerIDs: Set<String> = []
+    var highestOfferPerBuyer: [String: Double] = [:]
 
     
     var isLoadingOffers       = false
@@ -43,22 +40,32 @@ class SellerActivityDashboardViewModel {
 
     private let currentSellerID: String
 
-    private let offersListenerBox         = SellerActivityListenerBox()
-    private let allOffersListenerBox      = SellerActivityListenerBox()
-    private let bidsListenerBox           = SellerActivityListenerBox()
-    private let transactionsListenerBox   = SellerActivityListenerBox()
-    private let contractsListenerBox      = SellerActivityListenerBox()
-    private let urgentRequestsListenerBox = SellerActivityListenerBox()
+    private let offersListenerBox       = SellerActivityListenerBox()
+    private let allOffersListenerBox   = SellerActivityListenerBox()
+    private let bidsListenerBox        = SellerActivityListenerBox()
+    private let transactionsListenerBox = SellerActivityListenerBox()
+    private let contractsListenerBox   = SellerActivityListenerBox()
 
     init() {
         self.currentSellerID = AuthManager.shared.currentUserID
         loadCachedData()
+        startListeners()
+    }
+
+    private func startListeners(retryCount: Int = 0) {
+        guard !currentSellerID.isEmpty else {
+            guard retryCount < 5 else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                startListeners(retryCount: retryCount + 1)
+            }
+            return
+        }
         attachOffersListener()
         attachAllOffersListener()
         attachBidsListener()
         attachTransactionsListener()
         attachContractsListener()
-        attachUrgentRequestsListener()
     }
 
     private func loadCachedData() {
@@ -82,6 +89,7 @@ class SellerActivityDashboardViewModel {
         offersListenerBox.listener = Firestore.firestore()
             .collection("offers")
             .whereField("sellerID", isEqualTo: currentSellerID)
+            .whereField("status", in: ["pending", "declined"])
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -91,64 +99,55 @@ class SellerActivityDashboardViewModel {
                     return
                 }
 
-                self.myOffers = snapshot?.documents.compactMap {
+                // Sort newest first, then keep only the latest offer per buyer+urgency bucket
+                // Urgent and normal pitches to the same buyer are separate competitions
+                let sorted = snapshot?.documents.compactMap {
                     Offer(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
+
+                var seen = Set<String>()
+                self.myOffers = sorted.filter {
+                    let key = $0.buyerID + ($0.isUrgentPitch ? "_urgent" : "_normal")
+                    return seen.insert(key).inserted
+                }
 
                 CoreDataCache.shared.saveOffers(self.myOffers, ownerID: self.currentSellerID)
                 self.isLoadingOffers = false
             }
     }
 
-    // MARK: - All Offers Listener (derives lowest offer per buyer for winning status)
+    // MARK: - All Offers Listener (derives highest offer per buyer+urgency bucket for winning status)
     private func attachAllOffersListener() {
         allOffersListenerBox.listener = Firestore.firestore()
             .collection("offers")
+            .whereField("status", isEqualTo: "pending")
             .addSnapshotListener { [weak self] snapshot, _ in
                 guard let self, let docs = snapshot?.documents else { return }
 
-                // Keep the lowest offer amount per buyerID across all sellers
+                // Key: "buyerID_urgent" or "buyerID_normal" — urgent and normal pitches
+                // to the same buyer are separate competitions and must not cross-contaminate
                 var map: [String: Double] = [:]
                 for doc in docs {
                     let data = doc.data()
                     guard
-                        let buyerID = data["buyerID"] as? String,
-                        let amount  = data["amount"]  as? Double
+                        let buyerID  = data["buyerID"]  as? String,
+                        let amount   = data["amount"]   as? Double
                     else { continue }
-
-                    if (map[buyerID] ?? .infinity) > amount {
-                        map[buyerID] = amount
+                    let isUrgent = data["isUrgentPitch"] as? Bool ?? false
+                    let key = buyerID + (isUrgent ? "_urgent" : "_normal")
+                    if (map[key] ?? 0) < amount {
+                        map[key] = amount
                     }
                 }
-                self.lowestOfferPerBuyer = map
+                self.highestOfferPerBuyer = map
             }
     }
 
-    // MARK: - Winning Status Helper (seller wins when their offer is the lowest)
-    func isLowest(offer: Offer) -> Bool {
-        guard let lowest = lowestOfferPerBuyer[offer.buyerID] else { return false }
-        return offer.amount <= lowest
-    }
-
-    // MARK: - Urgent Status Helper (buyer has an active urgent request)
-    func isUrgent(offer: Offer) -> Bool {
-        urgentBuyerIDs.contains(offer.buyerID)
-    }
-
-    // MARK: - Urgent Requests Listener (tracks which buyers have active urgent posts)
-    private func attachUrgentRequestsListener() {
-        urgentRequestsListenerBox.listener = Firestore.firestore()
-            .collection("urgentRequests")
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self else { return }
-                if let error {
-                    print("UrgentRequests listener error (activity): \(error.localizedDescription)")
-                    return
-                }
-                self.urgentBuyerIDs = Set(
-                    snapshot?.documents.compactMap { $0.data()["buyerID"] as? String } ?? []
-                )
-            }
+    // MARK: - Winning Status Helper (seller wins when their offer is the highest in its bucket)
+    func isHighest(offer: Offer) -> Bool {
+        let key = offer.buyerID + (offer.isUrgentPitch ? "_urgent" : "_normal")
+        guard let highest = highestOfferPerBuyer[key] else { return false }
+        return offer.amount >= highest
     }
 
     // MARK: - Tab 1: Inbound Bids on This Seller's Harvest Lots
@@ -250,6 +249,36 @@ class SellerActivityDashboardViewModel {
         }
     }
 
+    // MARK: - Delete Pitch/Offer (only pending or declined)
+    func deletePitch(_ offer: Offer) {
+        guard offer.status == "pending" || offer.status == "declined" else { return }
+        Task {
+            do {
+                try await Firestore.firestore().collection("offers").document(offer.id).delete()
+            } catch {
+                print("Delete pitch error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Delete Transaction (local hide only — kept in Firestore for audit)
+    func deleteTransaction(at offsets: IndexSet) {
+        transactions.remove(atOffsets: offsets)
+        CoreDataCache.shared.saveTransactions(transactions, ownerID: currentSellerID)
+    }
+
+    // MARK: - Delete Contract (only completed or rejected)
+    func deleteContract(_ contract: Contract) {
+        guard contract.status == "completed" || contract.status == "rejected" else { return }
+        Task {
+            do {
+                try await Firestore.firestore().collection("contracts").document(contract.id).delete()
+            } catch {
+                print("Delete contract error: \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Local Push Notification (Inbound Bid Alert for Seller)
     private func scheduleNewBidNotification(bid: Bid) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -327,21 +356,4 @@ class SellerActivityDashboardViewModel {
     }
 
 
-    func formattedDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
-    }
-
-  
-    func statusDisplayText(_ status: String) -> String {
-        switch status {
-        case "escrow":      return "Escrow Held"
-        case "inspection":  return "Inspection Pending"
-        case "completed":   return "Completed"
-        case "rejected":    return "Rejected"
-        default:            return status.capitalized
-        }
-    }
 }

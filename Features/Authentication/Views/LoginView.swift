@@ -75,11 +75,13 @@ struct LoginView: View {
                             // MARK: Face ID Button
                             // Uses demoRoleSelection to decide which dashboard to open
                             Button {
-                                viewModel.authenticateWithFaceID { success, errorMsg in
+                                viewModel.authenticateWithFaceID { success, role, errorMsg in
                                     if success {
-                                        // Set role based on selected demo role
-                                        let role = viewModel.demoRoleSelection == "Buyer" ? "BUYER" : "SELLER"
-                                        self.userRole = role
+                                        // Use role returned from Firestore (real device)
+                                        // or demo picker fallback (simulator)
+                                        self.userRole = role.isEmpty
+                                            ? (viewModel.demoRoleSelection == "Buyer" ? "BUYER" : "SELLER")
+                                            : role
                                         self.isLoggedIn = true
                                     } else {
                                         viewModel.errorMessage = errorMsg

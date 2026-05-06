@@ -1,6 +1,21 @@
 
 import SwiftUI
 
+extension View {
+    @ViewBuilder
+    func conditionalSwipeDelete(enabled: Bool, action: @escaping () -> Void) -> some View {
+        if enabled {
+            self.swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive, action: action) {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        } else {
+            self
+        }
+    }
+}
+
 // 1. Centralize your brand color so it can be used anywhere in the app
 extension Color {
     static let polmureEmerald = Color(red: 0.1, green: 0.5, blue: 0.3)

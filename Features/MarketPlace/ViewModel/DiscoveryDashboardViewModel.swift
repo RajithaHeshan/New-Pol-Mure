@@ -22,6 +22,9 @@ class DiscoveryDashboardViewModel {
    
     var profileImageName: String = "Gemini_Generated_Image_l5uvm3l5uvm3l5uv"
     var fullName: String = ""
+    var monthlySpend: Double = 0.0
+
+    private var monthlySpendListener: ListenerRegistration?
 
    
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609) // Default: Kurunegala
@@ -69,14 +72,29 @@ class DiscoveryDashboardViewModel {
         attachHarvestsListener()
         attachSellerRatingsListener()
         attachContractsListener()
+        attachMonthlySpendListener()
         requestNotificationPermission()
     }
 
     // MARK: - Firebase Fetch Logic
-    func fetchUserProfile() {
+    func fetchUserProfile(retryCount: Int = 0) {
         let userId = AuthManager.shared.currentUserID
-        guard !userId.isEmpty else { return }
 
+        // If no session yet, retry up to 5 times with 1s delay (handles Face ID timing gap)
+        if userId.isEmpty {
+            guard retryCount < 5 else {
+                print("⚠️ fetchUserProfile: gave up after 5 retries — no currentUserID")
+                return
+            }
+            print("⚠️ fetchUserProfile: userId empty, retry \(retryCount + 1)/5 in 1s")
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                fetchUserProfile(retryCount: retryCount + 1)
+            }
+            return
+        }
+
+        print("✅ fetchUserProfile: fetching for userId = \(userId)")
         Task {
             do {
                 let document = try await Firestore.firestore().collection("users").document(userId).getDocument()
@@ -87,6 +105,7 @@ class DiscoveryDashboardViewModel {
                 }
                 if let name = data["fullName"] as? String {
                     self.fullName = name
+                    print("✅ fetchUserProfile: name loaded = \(name)")
                 }
 
                 // Decode buyer profile for ML scoring
@@ -107,6 +126,26 @@ class DiscoveryDashboardViewModel {
                 print("Error fetching profile from Firestore: \(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: - Monthly Spend Listener (current calendar month, buyer debit transactions)
+    private func attachMonthlySpendListener() {
+        let buyerID = AuthManager.shared.currentUserID
+        guard !buyerID.isEmpty else { return }
+
+        let calendar = Calendar.current
+        let now = Date()
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
+
+        monthlySpendListener = Firestore.firestore()
+            .collection("transactions")
+            .whereField("buyerID", isEqualTo: buyerID)
+            .whereField("isCredit", isEqualTo: false)
+            .whereField("completedAt", isGreaterThanOrEqualTo: Timestamp(date: monthStart))
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+                self.monthlySpend = docs.compactMap { $0.data()["amount"] as? Double }.reduce(0, +)
+            }
     }
 
     //Sellers Listener (profile edit section )

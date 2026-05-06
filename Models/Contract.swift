@@ -3,7 +3,7 @@ import FirebaseFirestore
 
 struct Contract: Identifiable, Hashable {
     let id: String
-    let contractRef: String
+    let contractRef: String  //# 4567 contract
     let buyerID: String
     let buyerName: String
     let sellerID: String

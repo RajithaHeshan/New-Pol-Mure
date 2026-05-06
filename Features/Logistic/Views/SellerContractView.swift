@@ -42,8 +42,8 @@ struct SellerContractView: View {
                                 .padding(.horizontal)
                         }
                         
-                        // EventKit Logic: Show calendar if en route and NOT disputed
-                        if !viewModel.isDisputed && viewModel.currentState == .buyerEnRoute {
+                        // EventKit Logic: Show calendar only when buyer is en route (not after quality approved)
+                        if !viewModel.isDisputed && viewModel.currentState == .buyerEnRoute && viewModel.inspectionDate > Date() {
                             calendarSchedulingCard
                         }
                         
@@ -122,6 +122,12 @@ struct SellerContractView: View {
                 .foregroundColor(calendarManager.eventAddedSuccessfully ? .green : .orange)
                 .cornerRadius(12)
             }.disabled(calendarManager.eventAddedSuccessfully)
+
+            if calendarManager.permissionDenied {
+                Text("Calendar access denied. Enable it in iOS Settings → Privacy → Calendars.")
+                    .font(.caption2)
+                    .foregroundColor(.red)
+            }
         }
         .padding().background(Color(UIColor.secondarySystemGroupedBackground)).cornerRadius(16).padding(.horizontal)
     }

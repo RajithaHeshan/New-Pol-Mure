@@ -1,4 +1,4 @@
-// Location: New-Pol-Mure/Models/Bid.swift
+
 
 import Foundation
 import FirebaseFirestore
@@ -14,7 +14,7 @@ struct Bid: Identifiable {
     let placedAt: Date
     let status: String      // "pending" | "accepted" | "declined"
 
-    init?(id: String, data: [String: Any]) {
+    init?(id: String, data: [String: Any]) {  //requiremnt missing 
         guard
             let bidderID   = data["bidderID"]   as? String,
             let bidderName = data["bidderName"] as? String,

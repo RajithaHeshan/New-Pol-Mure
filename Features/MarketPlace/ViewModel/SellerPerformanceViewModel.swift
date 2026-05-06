@@ -51,18 +51,23 @@ class SellerPerformanceViewModel {
 
     // Raw fetched data — kept as all-time; re-filtered on timeframe change
     private var allTransactions: [Transaction] = []
-    private var allContracts:    [Contract]    = []
     private var allOffers:       [Offer]       = []
 
     private let transactionsListenerBox = PerformanceListenerBox()
-    private let contractsListenerBox    = PerformanceListenerBox()
     private let offersListenerBox       = PerformanceListenerBox()
 
     init() {
         self.currentSellerID = AuthManager.shared.currentUserID
-        attachTransactionsListener()
-        attachContractsListener()
-        attachOffersListener()
+        if currentSellerID.isEmpty {
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self.attachTransactionsListener()
+                self.attachOffersListener()
+            }
+        } else {
+            attachTransactionsListener()
+            attachOffersListener()
+        }
     }
 
     func onTimeframeChanged() {
@@ -102,29 +107,6 @@ class SellerPerformanceViewModel {
             }
     }
 
-    private func attachContractsListener() {
-        guard !currentSellerID.isEmpty else { return }
-
-        // Include both statuses: transactions are written at "qualityApproved",
-        // contract moves to "completed" only after seller confirms pickup.
-        // Both represent a finished deal for performance purposes.
-        contractsListenerBox.listener = Firestore.firestore()
-            .collection("contracts")
-            .whereField("sellerID", isEqualTo: currentSellerID)
-            .whereField("status", in: ["qualityApproved", "completed"])
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self else { return }
-                if let error {
-                    print("Seller performance contracts error: \(error.localizedDescription)")
-                    return
-                }
-                self.allContracts = snapshot?.documents.compactMap {
-                    Contract(id: $0.documentID, data: $0.data())
-                } ?? []
-                self.recompute()
-            }
-    }
-
     private func attachOffersListener() {
         guard !currentSellerID.isEmpty else { return }
 
@@ -150,13 +132,12 @@ class SellerPerformanceViewModel {
         let now      = Date()
         let start    = windowStart(calendar: calendar, now: now)
 
-        // Filter to window
+        // Filter by completedAt (when money actually moved) — accurate across month boundaries
         let windowTransactions = allTransactions.filter { $0.completedAt >= start }
-        let windowContracts    = allContracts.filter    { $0.createdAt   >= start }
         let windowOffers       = allOffers.filter       { $0.placedAt    >= start }
 
-        // Nuts sold = sum of quantities on completed contracts in this window
-        nutsSold = windowContracts.reduce(0) { $0 + $1.quantity }
+        // Nuts sold = sum of quantities from window transactions (completedAt is accurate)
+        nutsSold = windowTransactions.reduce(0) { $0 + $1.quantity }
 
         // Pitch success rate = accepted pitches / total pitches in window
         let totalPitches    = windowOffers.count
@@ -167,7 +148,7 @@ class SellerPerformanceViewModel {
         recomputeChartData(transactions: windowTransactions, calendar: calendar, now: now)
 
         // Insights
-        updateInsights(windowContracts: windowContracts)
+        updateInsights(windowTransactions: windowTransactions)
     }
 
     // MARK: - Chart bucket grouping
@@ -239,7 +220,7 @@ class SellerPerformanceViewModel {
     }
 
     // MARK: - Dynamic Insights
-    private func updateInsights(windowContracts: [Contract]) {
+    private func updateInsights(windowTransactions: [Transaction]) {
         let pitchRevenue = detailedRevenueData.filter { $0.source == "Accepted Pitches" }.reduce(0) { $0 + $1.amount }
         let pitchPct     = totalRevenue > 0 ? Int((pitchRevenue / totalRevenue) * 100) : 0
 
@@ -248,9 +229,9 @@ class SellerPerformanceViewModel {
             : "No pitch revenue this period. Try placing offers on the Urgent Board to diversify your income."
 
         let marketBaseline: Double = 105.0
-        if !windowContracts.isEmpty {
-            let avgAmount = windowContracts.reduce(0.0) { $0 + $1.amount } / Double(windowContracts.count)
-            let diffPct   = ((avgAmount - marketBaseline) / marketBaseline) * 100
+        if !windowTransactions.isEmpty {
+            let avgPricePerNut = windowTransactions.reduce(0.0) { $0 + $1.pricePerNut } / Double(windowTransactions.count)
+            let diffPct = ((avgPricePerNut - marketBaseline) / marketBaseline) * 100
             insightPremiumDesc = diffPct >= 0
                 ? "You sold \(String(format: "%.1f", diffPct))% above the market average (Rs \(Int(marketBaseline)) per nut) this period. Strong pricing."
                 : "Your average price is \(String(format: "%.1f", abs(diffPct)))% below the market average this period. Try setting a higher starting bid."
@@ -258,8 +239,8 @@ class SellerPerformanceViewModel {
             insightPremiumDesc = "No completed contracts this period. Complete a sale to see pricing insights."
         }
 
-        insightEscrowDesc = windowContracts.isEmpty
+        insightEscrowDesc = windowTransactions.isEmpty
             ? "No completed contracts this period. Escrow data will appear after your first sale."
-            : "You completed \(windowContracts.count) contract(s) this period. Ask buyers to complete inspection quickly to release escrow faster."
+            : "You completed \(windowTransactions.count) transaction(s) this period. Ask buyers to complete inspection quickly to release escrow faster."
     }
 }

@@ -20,103 +20,124 @@ struct SellerActivityDashboardView: View {
                 .padding()
                 .background(Color(UIColor.systemBackground))
 
-                ScrollView {
-                    VStack(spacing: 16) {
-
-                        if viewModel.selectedTab == 0 {
-                          
-                            if viewModel.isLoadingOffers {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 40)
-                            } else if viewModel.myOffers.isEmpty {
-                                SellerEmptyActivityView(message: "You haven't pitched any buyers yet.")
-                            } else {
-                                ForEach(viewModel.myOffers) { offer in
-                                    SellerPendingPitchRow(
-                                        buyerName: offer.buyerName.isEmpty ? offer.buyerID : offer.buyerName,
-                                        location: "",
-                                        currentOffer: offer.amount,
-                                        isLowest: viewModel.isLowest(offer: offer),
-                                        isUrgent: offer.isUrgentPitch
-                                    )
-                                }
-                            }
-
-                        } else if viewModel.selectedTab == 1 {
-                            // DIRECT BIDS
-                            HStack {
-                                Text("Inbound bids on your active harvests")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-
-                            if viewModel.isLoadingBids {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 40)
-                            } else if viewModel.incomingBids.isEmpty {
-                                SellerEmptyActivityView(message: "No bids received on your harvests yet.")
-                            } else {
-                                ForEach(viewModel.incomingBids) { bid in
-                                    SellerDirectBidRow(
-                                        bid: bid,
-                                        onAccept:  { viewModel.acceptBid(bid) },
-                                        onDecline: { viewModel.declineBid(bid) }
-                                    )
-                                }
-                            }
-
-                        } else if viewModel.selectedTab == 2 {
-                           
-                            HStack {
-                                Text("Recent Financial Transactions")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                            }
-                            .padding(.horizontal)
-
-                            if viewModel.isLoadingTransactions {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 40)
-                            } else if viewModel.transactions.isEmpty {
-                                SellerEmptyActivityView(message: "No completed transactions yet.")
-                            } else {
-                                ForEach(viewModel.transactions) { tx in
-                                    SellerTransactionDetailCard(tx: tx)
-                                }
-                            }
-
+                List {
+                    if viewModel.selectedTab == 0 {
+                        if viewModel.isLoadingOffers {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else if viewModel.myOffers.isEmpty {
+                            SellerEmptyActivityView(message: "You haven't pitched any buyers yet.")
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
                         } else {
-                         
-                            if viewModel.isLoadingContracts {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 40)
-                            } else if viewModel.contracts.isEmpty {
-                                SellerEmptyActivityView(message: "No active contracts.")
-                            } else {
-                                ForEach(viewModel.contracts) { contract in
-                                    NavigationLink(destination: SellerContractView(contract: contract)) {
-                                        SellerContractRow(
-                                            contractNumber: contract.contractRef,
-                                            partnerName: contract.buyerName,
-                                            status: contract.status,
-                                            createdAt: contract.createdAt
-                                        )
+                            ForEach(viewModel.myOffers) { offer in
+                                SellerPendingPitchRow(
+                                    buyerName: offer.buyerName.isEmpty ? offer.buyerID : offer.buyerName,
+                                    location: "",
+                                    currentOffer: offer.amount,
+                                    isHighest: viewModel.isHighest(offer: offer),
+                                    isUrgent: offer.isUrgentPitch
+                                )
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .conditionalSwipeDelete(
+                                    enabled: offer.status == "pending" || offer.status == "declined"
+                                ) { viewModel.deletePitch(offer) }
+                            }
+                        }
+
+                    } else if viewModel.selectedTab == 1 {
+                        if viewModel.isLoadingBids {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else if viewModel.incomingBids.isEmpty {
+                            SellerEmptyActivityView(message: "No bids received on your harvests yet.")
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            ForEach(viewModel.incomingBids) { bid in
+                                SellerDirectBidRow(
+                                    bid: bid,
+                                    onAccept:  { viewModel.acceptBid(bid) },
+                                    onDecline: { viewModel.declineBid(bid) }
+                                )
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            }
+                        }
+
+                    } else if viewModel.selectedTab == 2 {
+                        if viewModel.isLoadingTransactions {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else if viewModel.transactions.isEmpty {
+                            SellerEmptyActivityView(message: "No completed transactions yet.")
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            ForEach(viewModel.transactions) { tx in
+                                SellerTransactionDetailCard(tx: tx)
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) {
+                                            if let idx = viewModel.transactions.firstIndex(where: { $0.id == tx.id }) {
+                                                viewModel.deleteTransaction(at: IndexSet(integer: idx))
+                                            }
+                                        } label: {
+                                            Label("Hide", systemImage: "eye.slash")
+                                        }
                                     }
-                                    .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+
+                    } else {
+                        if viewModel.isLoadingContracts {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else if viewModel.contracts.isEmpty {
+                            SellerEmptyActivityView(message: "No active contracts.")
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                        } else {
+                            ForEach(viewModel.contracts) { contract in
+                                NavigationLink(destination: SellerContractView(contract: contract)) {
+                                    SellerContractRow(
+                                        contractNumber: contract.contractRef,
+                                        partnerName: contract.buyerName,
+                                        status: contract.status,
+                                        createdAt: contract.createdAt
+                                    )
                                 }
+                                .buttonStyle(PlainButtonStyle())
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .conditionalSwipeDelete(
+                                    enabled: contract.status == "completed" || contract.status == "rejected"
+                                ) { viewModel.deleteContract(contract) }
                             }
                         }
                     }
-                    .padding(.vertical)
                 }
+                .listStyle(.plain)
                 .background(Color(UIColor.systemGroupedBackground))
+                .scrollContentBackground(.hidden)
             }
             .navigationTitle("My Activity")
             // Apply Orange Tint to the Segmented Picker
@@ -150,7 +171,7 @@ struct SellerPendingPitchRow: View {
     let buyerName: String
     let location: String
     let currentOffer: Double
-    let isLowest: Bool
+    let isHighest: Bool
     var isUrgent: Bool = false
 
     var body: some View {
@@ -177,11 +198,11 @@ struct SellerPendingPitchRow: View {
                 }
                 HStack {
                     Circle()
-                        .fill(isLowest ? Color.green : Color.red)
+                        .fill(isHighest ? Color.green : Color.red)
                         .frame(width: 8, height: 8)
-                    Text(isLowest ? "Lowest Pitch (Winning)" : "Underbid")
+                    Text(isHighest ? "Highest Pitch (Winning)" : "Outpitched")
                         .font(.caption.bold())
-                        .foregroundColor(isLowest ? .green : .red)
+                        .foregroundColor(isHighest ? .green : .red)
                 }
             }
             Spacer()
@@ -199,7 +220,6 @@ struct SellerPendingPitchRow: View {
         .overlay(
             isUrgent ? RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.4), lineWidth: 1) : nil
         )
-        .padding(.horizontal)
     }
 }
 
@@ -280,7 +300,6 @@ struct SellerDirectBidRow: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
-        .padding(.horizontal)
     }
 }
 
@@ -338,7 +357,6 @@ struct SellerTransactionDetailCard: View {
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green.opacity(0.2), lineWidth: 1))
-        .padding(.horizontal)
     }
 
     private func txRow(icon: String, label: String, value: String) -> some View {
@@ -431,7 +449,6 @@ struct SellerContractRow: View {
         .padding()
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(12)
-        .padding(.horizontal)
     }
 }
 

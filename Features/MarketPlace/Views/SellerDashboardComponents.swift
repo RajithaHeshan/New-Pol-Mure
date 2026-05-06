@@ -94,7 +94,7 @@ struct UrgentActionBanner: View {
 
 struct RecommendedBuyerCard: View {
     let buyer: RegisteredBuyer
-    var lowestOffer: Double?
+    var highestOffer: Double?
     var showUrgentBadge: Bool = false
 
     var body: some View {
@@ -126,12 +126,12 @@ struct RecommendedBuyerCard: View {
                 }
                 .padding(.top, 4)
 
-                // MARK: - Live Lowest Offer Badge
-                if let price = lowestOffer {
+                // MARK: - Live Highest Offer Badge
+                if let price = highestOffer {
                     HStack(spacing: 4) {
                         Image(systemName: "tag.fill")
                             .font(.caption2)
-                        Text("Lowest: Rs \(String(format: "%.0f", price))")
+                        Text("Highest: Rs \(String(format: "%.0f", price))")
                             .font(.caption.bold())
                     }
                     .foregroundColor(.green)
@@ -150,7 +150,7 @@ struct RecommendedBuyerCard: View {
 
 struct BuyerRowCard: View {
     let buyer: RegisteredBuyer
-    var lowestOffer: Double?
+    var highestOffer: Double?
     var showUrgentBadge: Bool = false
 
     var body: some View {
@@ -169,7 +169,7 @@ struct BuyerRowCard: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     StarRatingBadge(rating: buyer.rating, count: buyer.ratingCount)
-                    if let price = lowestOffer {
+                    if let price = highestOffer {
                         HStack(spacing: 3) {
                             Image(systemName: "tag.fill")
                                 .font(.caption2)

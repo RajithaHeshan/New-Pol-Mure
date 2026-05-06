@@ -40,8 +40,8 @@ class SellerDashboardViewModel {
     var allBuyers: [RegisteredBuyer] = []
     var isLoadingBuyers = false
 
-    // Live lowest offer per buyerID — drives the price badge on every buyer card
-    var lowestOfferPerBuyer: [String: Double] = [:]
+    // Live highest offer per buyerID — drives the price badge on every buyer card
+    var highestOfferPerBuyer: [String: Double] = [:]
     private let offersListenerBox = DashboardListenerBox()
     private let buyersListenerBox = DashboardListenerBox()
     private let urgentRequestsListenerBox = DashboardListenerBox()
@@ -83,15 +83,17 @@ class SellerDashboardViewModel {
 
     // Called from .onAppear so listeners are (re)attached after auth is fully restored
     func onAppear() {
+        fetchUserProfile()
         attachMetricsListener()
         attachUrgentListeners()
     }
 
 
-    // MARK: - Real-Time Lowest Offer per Buyer
+    // MARK: - Real-Time Highest Offer per Buyer
     private func attachOffersListener() {
         offersListenerBox.listener = Firestore.firestore()
             .collection("offers")
+            .whereField("status", isEqualTo: "pending")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -104,19 +106,19 @@ class SellerDashboardViewModel {
                     Offer(id: $0.documentID, data: $0.data())
                 } ?? []
 
-                // Rebuild the lowest-offer-per-buyer map on every snapshot
+                // Rebuild the highest-offer-per-buyer map on every snapshot
                 var map: [String: Double] = [:]
                 for offer in allOffers {
                     if let existing = map[offer.buyerID] {
-                        if offer.amount < existing { map[offer.buyerID] = offer.amount }
+                        if offer.amount > existing { map[offer.buyerID] = offer.amount }
                     } else {
                         map[offer.buyerID] = offer.amount
                     }
                 }
-                self.lowestOfferPerBuyer = map
+                self.highestOfferPerBuyer = map
                 self.computeMLRecommendations()
 
-                // activeOffersTotal = sum of the lowest pitch won per buyer by this seller
+                // activeOffersTotal = sum of this seller's active pitches
                 let sellerID = AuthManager.shared.currentUserID
                 guard !sellerID.isEmpty else { return }
                 self.activeOffersTotal = allOffers
@@ -203,9 +205,17 @@ class SellerDashboardViewModel {
     }
 
     // MARK: - Firebase Fetch Logic
-    func fetchUserProfile() {
+    func fetchUserProfile(retryCount: Int = 0) {
         let userId = AuthManager.shared.currentUserID
-        guard !userId.isEmpty else { return }
+
+        if userId.isEmpty {
+            guard retryCount < 5 else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                fetchUserProfile(retryCount: retryCount + 1)
+            }
+            return
+        }
 
         Task {
             do {
@@ -327,12 +337,12 @@ class SellerDashboardViewModel {
         guard !allBuyers.isEmpty else { return }
 
         let engine = RecommendationEngine.shared
-        let avgMarketOffer = lowestOfferPerBuyer.values.reduce(0, +) / max(1, Double(lowestOfferPerBuyer.count))
+        let avgMarketOffer = highestOfferPerBuyer.values.reduce(0, +) / max(1, Double(highestOfferPerBuyer.count))
 
         let scored: [(RegisteredBuyer, Double)] = allBuyers.map { buyer in
             let buyerVolume = RecommendationEngine.parseVolume(buyer.typicalVolume)
             let buyerNeedsExport = buyer.businessType.lowercased().contains("export")
-            let buyerOffer = lowestOfferPerBuyer[buyer.id] ?? 0
+            let buyerOffer = highestOfferPerBuyer[buyer.id] ?? 0
             let priceDelta = buyerOffer - avgMarketOffer
             let txCount = historicalTransactions[buyer.id] ?? 0
 

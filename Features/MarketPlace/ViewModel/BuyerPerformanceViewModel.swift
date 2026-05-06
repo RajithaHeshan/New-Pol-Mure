@@ -51,18 +51,24 @@ class BuyerPerformanceViewModel {
 
     // Raw fetched data — kept all-time; re-filtered on timeframe change
     private var allTransactions: [Transaction] = []
-    private var allContracts:    [Contract]    = []
     private var allBids:         [Bid]         = []
 
     private let transactionsListenerBox = BuyerPerformanceListenerBox()
-    private let contractsListenerBox    = BuyerPerformanceListenerBox()
     private let bidsListenerBox         = BuyerPerformanceListenerBox()
 
     init() {
         self.currentBuyerID = AuthManager.shared.currentUserID
-        attachTransactionsListener()
-        attachContractsListener()
-        attachBidsListener()
+        if currentBuyerID.isEmpty {
+            // Face ID login may not have saved session yet — retry once after 1s
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                self.attachTransactionsListener()
+                self.attachBidsListener()
+            }
+        } else {
+            attachTransactionsListener()
+            attachBidsListener()
+        }
     }
 
     func onTimeframeChanged() {
@@ -102,28 +108,6 @@ class BuyerPerformanceViewModel {
             }
     }
 
-    private func attachContractsListener() {
-        guard !currentBuyerID.isEmpty else { return }
-
-        // Include both statuses: transactions are written at "qualityApproved",
-        // contract moves to "completed" only after seller confirms pickup.
-        contractsListenerBox.listener = Firestore.firestore()
-            .collection("contracts")
-            .whereField("buyerID", isEqualTo: currentBuyerID)
-            .whereField("status", in: ["qualityApproved", "completed"])
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self else { return }
-                if let error {
-                    print("Buyer performance contracts error: \(error.localizedDescription)")
-                    return
-                }
-                self.allContracts = snapshot?.documents.compactMap {
-                    Contract(id: $0.documentID, data: $0.data())
-                } ?? []
-                self.recompute()
-            }
-    }
-
     private func attachBidsListener() {
         guard !currentBuyerID.isEmpty else { return }
 
@@ -149,26 +133,29 @@ class BuyerPerformanceViewModel {
         let now      = Date()
         let start    = windowStart(calendar: calendar, now: now)
 
+        // Filter transactions by completedAt (when money actually moved)
         let windowTransactions = allTransactions.filter { $0.completedAt >= start }
-        let windowContracts    = allContracts.filter    { $0.createdAt   >= start }
-        let windowBids         = allBids.filter         { $0.placedAt    >= start }
+        // Filter contracts by completedAt via matching transactions — use transaction quantity for accuracy
+        let windowBids         = allBids.filter { $0.placedAt >= start }
 
-        // Nuts acquired = sum of quantities from completed contracts in this window
-        totalVolumeNuts = windowContracts.reduce(0) { $0 + $1.quantity }
+        // Nuts acquired = sum of quantities from window transactions (completedAt is accurate)
+        totalVolumeNuts = windowTransactions.reduce(0) { $0 + $1.quantity }
 
-        // Win rate: for each unique harvestID bid on in this window, check if buyer holds the highest bid
+        // Win rate: compare buyer's top bid per harvest against ALL bids in the same window only
         var highestBidPerHarvest: [String: Double] = [:]
-        for bid in allBids {
+        for bid in windowBids {
             if (highestBidPerHarvest[bid.harvestID] ?? 0) < bid.amount {
                 highestBidPerHarvest[bid.harvestID] = bid.amount
             }
         }
-        let windowHarvestIDs = Set(windowBids.map { $0.harvestID })
-        let myTopBidPerHarvest: [String: Double] = windowBids.reduce(into: [:]) { map, bid in
-            if (map[bid.harvestID] ?? 0) < bid.amount {
-                map[bid.harvestID] = bid.amount
+        let windowHarvestIDs = Set(windowBids.filter { $0.bidderID == currentBuyerID }.map { $0.harvestID })
+        let myTopBidPerHarvest: [String: Double] = windowBids
+            .filter { $0.bidderID == currentBuyerID }
+            .reduce(into: [:]) { map, bid in
+                if (map[bid.harvestID] ?? 0) < bid.amount {
+                    map[bid.harvestID] = bid.amount
+                }
             }
-        }
         let totalLots = windowHarvestIDs.count
         let wonLots   = myTopBidPerHarvest.filter { harvestID, myTop in
             highestBidPerHarvest[harvestID] == myTop
@@ -176,7 +163,7 @@ class BuyerPerformanceViewModel {
         winRate = totalLots > 0 ? Int((Double(wonLots) / Double(totalLots)) * 100) : 0
 
         recomputeChartData(transactions: windowTransactions, calendar: calendar, now: now)
-        updateInsights(windowContracts: windowContracts)
+        updateInsights(windowTransactions: windowTransactions)
     }
 
     // MARK: - Chart bucket grouping
@@ -246,7 +233,7 @@ class BuyerPerformanceViewModel {
     }
 
     // MARK: - Dynamic Insights
-    private func updateInsights(windowContracts: [Contract]) {
+    private func updateInsights(windowTransactions: [Transaction]) {
         let offersSpend = detailedSpendData.filter { $0.source == "Accepted Offers" }.reduce(0) { $0 + $1.amount }
         let offerPct    = totalSpend > 0 ? Int((offersSpend / totalSpend) * 100) : 0
 
@@ -255,9 +242,9 @@ class BuyerPerformanceViewModel {
             : "No offer spend this period. Accept a seller's pitch to diversify your sourcing."
 
         let marketBaseline: Double = 105.0
-        if !windowContracts.isEmpty {
-            let avgAmount = windowContracts.reduce(0.0) { $0 + $1.amount } / Double(windowContracts.count)
-            let diffPct   = ((avgAmount - marketBaseline) / marketBaseline) * 100
+        if !windowTransactions.isEmpty {
+            let avgPricePerNut = windowTransactions.reduce(0.0) { $0 + $1.pricePerNut } / Double(windowTransactions.count)
+            let diffPct = ((avgPricePerNut - marketBaseline) / marketBaseline) * 100
             insightSourcingDesc = diffPct <= 0
                 ? "Your average cost is \(String(format: "%.1f", abs(diffPct)))% below the market average (Rs \(Int(marketBaseline)) per nut). Great sourcing."
                 : "Your average cost is \(String(format: "%.1f", diffPct))% above market this period. Bid on more auctions for better deals."

@@ -69,7 +69,7 @@ struct SellerDashboardView: View {
                                 HStack(spacing: 16) {
                                     ForEach(viewModel.recommendedBuyers) { buyer in
                                         NavigationLink(destination: LiveOfferView(buyer: buyer)) {
-                                            RecommendedBuyerCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id], showUrgentBadge: viewModel.selectedFilter == "Urgent Need")
+                                            RecommendedBuyerCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id], showUrgentBadge: viewModel.selectedFilter == "Urgent Need")
                                         }
                                         .buttonStyle(PlainButtonStyle())
                                     }
@@ -195,7 +195,7 @@ struct SellerDashboardView: View {
                             } else {
                                 LazyVStack(spacing: 16) {
                                     ForEach(viewModel.buyersInRadius) { buyer in
-                                        BuyerRowCard(buyer: buyer, lowestOffer: viewModel.lowestOfferPerBuyer[buyer.id])
+                                        BuyerRowCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id])
                                     }
                                 }
                                 .padding(.horizontal)

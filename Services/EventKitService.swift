@@ -78,11 +78,12 @@ class BuyerCalendarManager: ObservableObject {
         // Title: "Polmure Pick-up: Mahesh Silva"
         event.title = "Polmure Pick-up: \(sellerName)"
 
-        // Location: human-readable estate name + GPS so Apple Maps computes travel time
-        let locationString = locationName.isEmpty
-            ? "\(sellerCoordinate.latitude),\(sellerCoordinate.longitude)"
-            : "\(locationName) (\(sellerCoordinate.latitude),\(sellerCoordinate.longitude))"
-        event.location = locationString
+        // Use EKStructuredLocation so Apple Maps shows the pin and computes travel time
+        // without exposing raw GPS coordinates to the user
+        let structuredLocation = EKStructuredLocation(title: locationName.isEmpty ? "Seller's Estate" : locationName)
+        structuredLocation.geoLocation = CLLocation(latitude: sellerCoordinate.latitude, longitude: sellerCoordinate.longitude)
+        event.structuredLocation = structuredLocation
+        event.location = locationName.isEmpty ? nil : locationName
 
         // Notes: contract ref + volume + Rs/nut + deep link
         let yieldLine = sellerYield.isEmpty ? "" : "Volume: \(sellerYield) Nuts\n"

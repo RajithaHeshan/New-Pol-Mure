@@ -39,8 +39,6 @@ struct LiveOfferView: View {
                     }
 
                     OfferTerminal(viewModel: viewModel, isInputFocused: _isInputFocused)
-
-                    PresentationDebugToolsOffer(viewModel: viewModel)
                 }
                 .padding(20)
             }
@@ -152,19 +150,19 @@ struct OfferTerminal: View {
     var body: some View {
         VStack(spacing: 20) {
             VStack(spacing: 8) {
-                Text(viewModel.isUndercut ? "WARNING: CHEAPER OFFER SUBMITTED!" : "CURRENT LOWEST PITCH")
+                Text(viewModel.isOutpitched ? "WARNING: HIGHER OFFER SUBMITTED!" : "CURRENT HIGHEST PITCH")
                     .font(.caption.bold())
-                    .foregroundColor(viewModel.isUndercut ? .red : .secondary)
+                    .foregroundColor(viewModel.isOutpitched ? .red : .secondary)
 
-                Text("Rs \(viewModel.currentLowestOffer, specifier: "%.2f")")
+                Text("Rs \(viewModel.currentHighestOffer, specifier: "%.2f")")
                     .font(.system(size: 40, weight: .bold, design: .monospaced))
-                    .foregroundColor(viewModel.isUndercut ? .red : .green)
+                    .foregroundColor(viewModel.isOutpitched ? .red : .green)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
-            .background(viewModel.isUndercut ? Color.red.opacity(0.1) : Color.green.opacity(0.05))
+            .background(viewModel.isOutpitched ? Color.red.opacity(0.1) : Color.green.opacity(0.05))
             .cornerRadius(16)
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isUndercut)
+            .animation(.easeInOut(duration: 0.3), value: viewModel.isOutpitched)
 
             HStack(spacing: 12) {
                 Button(action: { viewModel.decrementOffer() }) {
@@ -237,22 +235,6 @@ struct OfferTerminal: View {
     }
 }
 
-struct PresentationDebugToolsOffer: View {
-    @Bindable var viewModel: LiveOfferViewModel
-
-    var body: some View {
-        Button(action: { viewModel.simulateCheaperOffer() }) {
-            Text("🔧 Simulate Competitor Cheaper Offer")
-                .font(.caption.bold())
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
-        }
-        .padding(.top, 40)
-    }
-}
 
 #Preview {
     NavigationStack {

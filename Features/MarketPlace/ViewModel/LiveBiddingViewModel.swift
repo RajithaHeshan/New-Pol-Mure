@@ -2,10 +2,10 @@ import SwiftUI
 import FirebaseFirestore
 import UserNotifications
 
-private final class ListenerBox {
-    var listener: ListenerRegistration?
+private final class ListenerBox {   
+    var listener: ListenerRegistration? //handle realtime data
     init() {}
-    deinit { listener?.remove() }
+    deinit { listener?.remove() } // prevent memory leaked
 }
 
 @Observable
@@ -46,11 +46,11 @@ class LiveBiddingViewModel {
         }
     }
 
-    // Listens on bids for this specific harvest document ID
+
     private func attachBidsListener() {
         listenerBox.listener = Firestore.firestore()
             .collection("bids")
-            .whereField("harvestID", isEqualTo: lot.id)
+            .whereField("harvestID", isEqualTo: lot.id) // filter only bids only this harvest. all the bid share with other buyres
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -59,19 +59,25 @@ class LiveBiddingViewModel {
                     return
                 }
 
+
+                //get all the dids sort in descending order
                 let allBids = snapshot?.documents.compactMap {
                     Bid(id: $0.documentID, data: $0.data())
                 } ?? []
+
+                //take top one
 
                 guard let topBid = allBids.sorted(by: { $0.amount > $1.amount }).first else {
                     self.isFirstSnapshot = false
                     return
                 }
 
-                if self.isFirstSnapshot {
+
+
+                if self.isFirstSnapshot {  //initial login 
                     self.currentHighestBid = topBid.amount
                     self.currentHighestBidderID = topBid.bidderID
-                    self.isFirstSnapshot = false
+                    self.isFirstSnapshot = false //login initially no outbid notifcation 
                     return
                 }
 
@@ -84,22 +90,24 @@ class LiveBiddingViewModel {
                     return
                 }
 
-                let currentBuyerHasBid = allBids.contains { $0.bidderID == self.currentBuyerID }
+                let currentBuyerHasBid = allBids.contains { $0.bidderID == self.currentBuyerID } // current buyer inlcude one than bid
                 if currentBuyerHasBid && topBid.bidderID != previousLeaderID && !self.isOutbid {
                     self.isOutbid = true
-                    self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName)
+                    self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName) //push notofication 
                 }
             }
     }
 
+
+
     func incrementBid(by amount: Double) {
-        let currentInput = Double(userBidInput) ?? currentHighestBid
+        let currentInput = Double(userBidInput) ?? currentHighestBid  //if textfiedl empty use current higherbid
         userBidInput = String(format: "%.0f", currentInput + amount)
     }
 
     func decrementBid() {
         let currentInput = Double(userBidInput) ?? currentHighestBid
-        if currentInput > currentHighestBid + 1 {
+        if currentInput > currentHighestBid + 1 { // than current higherbid
             userBidInput = String(format: "%.0f", currentInput - 1)
         }
     }

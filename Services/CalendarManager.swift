@@ -70,11 +70,11 @@ class CalendarManager: ObservableObject {
         // Title: "Buyer Arriving: Nimal's Bakery"
         event.title = "Buyer Arriving: \(buyerName)"
 
-        // Location: human-readable estate name + GPS so Apple Maps can navigate
-        let locationString = locationName.isEmpty
-            ? "\(sellerCoordinate.latitude),\(sellerCoordinate.longitude)"
-            : "\(locationName) (\(sellerCoordinate.latitude),\(sellerCoordinate.longitude))"
-        event.location = locationString
+        // Use EKStructuredLocation so Apple Maps shows the pin without exposing raw GPS coordinates
+        let structuredLocation = EKStructuredLocation(title: locationName.isEmpty ? "Estate" : locationName)
+        structuredLocation.geoLocation = CLLocation(latitude: sellerCoordinate.latitude, longitude: sellerCoordinate.longitude)
+        event.structuredLocation = structuredLocation
+        event.location = locationName.isEmpty ? nil : locationName
 
         // Notes: contract ref + value + deep link + preparation reminder
         event.notes = """
