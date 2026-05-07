@@ -151,7 +151,7 @@ class LiveOfferViewModel {
                 identifier: "newoffer-\(buyerID)-\(Date().timeIntervalSince1970)",
                 content: content, trigger: nil
             )
-            UNUserNotificationCenter.current().add(request) { error in
+            UNUserNotificationCenter.current().add(request) { error in  //call new offer notifcation 
                 if let error { print("New offer notification error: \(error.localizedDescription)") }
             }
         }

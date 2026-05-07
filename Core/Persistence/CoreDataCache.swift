@@ -2,9 +2,7 @@ import CoreData
 import Foundation
 import FirebaseFirestore
 
-// Write-through cache: called from Firebase snapshot handlers to persist data locally.
-// Read path: called once on ViewModel init so the UI has something to show before Firebase responds.
-// Never writes to Firebase. Never modifies existing working code paths.
+
 final class CoreDataCache {
     static let shared = CoreDataCache()
     private let context: NSManagedObjectContext
@@ -13,8 +11,7 @@ final class CoreDataCache {
         context = PersistenceController.shared.container.viewContext
     }
 
-    // MARK: - User Profile
-
+  
     func saveUserProfile(userId: String, data: [String: Any]) {
         context.perform {
             let request: NSFetchRequest<CachedUserProfile> = CachedUserProfile.fetchRequest()
@@ -53,7 +50,7 @@ final class CoreDataCache {
         ]
     }
 
-    // MARK: - Contracts
+   
 
     func saveContracts(_ contracts: [Contract], ownerID: String) {
         context.perform {
@@ -113,7 +110,7 @@ final class CoreDataCache {
         }
     }
 
-    // MARK: - Bids
+
 
     func saveBids(_ bids: [Bid], ownerID: String) {
         context.perform {
@@ -164,7 +161,7 @@ final class CoreDataCache {
         }
     }
 
-    // MARK: - Offers
+   
 
     func saveOffers(_ offers: [Offer], ownerID: String) {
         context.perform {
@@ -215,7 +212,7 @@ final class CoreDataCache {
         }
     }
 
-    // MARK: - Transactions
+   
 
     func saveTransactions(_ transactions: [Transaction], ownerID: String) {
         context.perform {

@@ -81,7 +81,8 @@ class SellerActivityDashboardViewModel {
         if !cachedContracts.isEmpty { contracts = cachedContracts }
     }
 
-    // MARK: - Tab 0: My Offers Listener
+
+
     private func attachOffersListener() {
         guard !currentSellerID.isEmpty else { return }
         isLoadingOffers = true
@@ -99,24 +100,20 @@ class SellerActivityDashboardViewModel {
                     return
                 }
 
-                // Sort newest first, then keep only the latest offer per buyer+urgency bucket
-                // Urgent and normal pitches to the same buyer are separate competitions
-                let sorted = snapshot?.documents.compactMap {
+                // Show ALL pitches sorted newest first — no deduplication
+                // Each pitch shows its own date/time and winning status independently
+                self.myOffers = snapshot?.documents.compactMap {
                     Offer(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
-
-                var seen = Set<String>()
-                self.myOffers = sorted.filter {
-                    let key = $0.buyerID + ($0.isUrgentPitch ? "_urgent" : "_normal")
-                    return seen.insert(key).inserted
-                }
 
                 CoreDataCache.shared.saveOffers(self.myOffers, ownerID: self.currentSellerID)
                 self.isLoadingOffers = false
             }
     }
 
-    // MARK: - All Offers Listener (derives highest offer per buyer+urgency bucket for winning status)
+  
+  //urgent posts
+  
     private func attachAllOffersListener() {
         allOffersListenerBox.listener = Firestore.firestore()
             .collection("offers")
@@ -150,7 +147,7 @@ class SellerActivityDashboardViewModel {
         return offer.amount >= highest
     }
 
-    // MARK: - Tab 1: Inbound Bids on This Seller's Harvest Lots
+   
     private func attachBidsListener() {
         guard !currentSellerID.isEmpty else { return }
         isLoadingBids = true
@@ -171,7 +168,7 @@ class SellerActivityDashboardViewModel {
                     Bid(id: $0.documentID, data: $0.data())
                 }.sorted { $0.placedAt > $1.placedAt } ?? []
 
-                // Fire notification only for genuinely new pending bids (not on first load)
+              
                 if !self.incomingBids.isEmpty {
                     let existingIDs = Set(self.incomingBids.map { $0.id })
                     for bid in updated where !existingIDs.contains(bid.id) && bid.status == "pending" {
@@ -185,7 +182,10 @@ class SellerActivityDashboardViewModel {
             }
     }
 
-    // MARK: - Accept Bid → creates a Contract and marks bid accepted
+   
+
+   //accept bids and generate contract 
+
     func acceptBid(_ bid: Bid) {
         let db = Firestore.firestore()
 
@@ -210,7 +210,10 @@ class SellerActivityDashboardViewModel {
                     "createdAt":   Timestamp()
                 ]
 
-                // For harvest bids: store harvest coordinates + quantity + location
+                
+                //for harvest
+
+
                 if !bid.harvestID.isEmpty {
                     let harvestDoc = try? await db.collection("harvestLots").document(bid.harvestID).getDocument()
                     if let data = harvestDoc?.data() {
@@ -279,7 +282,9 @@ class SellerActivityDashboardViewModel {
         }
     }
 
-    // MARK: - Local Push Notification (Inbound Bid Alert for Seller)
+   
+   //bids alert for sellers 
+
     private func scheduleNewBidNotification(bid: Bid) {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
@@ -302,7 +307,7 @@ class SellerActivityDashboardViewModel {
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 
-    // MARK: - Tab 2: Transactions Listener
+    
     private func attachTransactionsListener() {
         guard !currentSellerID.isEmpty else { return }
         isLoadingTransactions = true

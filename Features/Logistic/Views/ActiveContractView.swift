@@ -55,7 +55,7 @@ struct ActiveContractView: View {
                     viewModel.isPulsing = true
                 }
             }
-            .sheet(isPresented: $viewModel.showDisputeModal) {
+            .sheet(isPresented: $viewModel.showDisputeModal) {  //dispite 
                 DisputeModalView(contractID: viewModel.contractID, originalBid: viewModel.amount)
                     .presentationDetents([.large, .medium])
             }
@@ -78,6 +78,9 @@ struct ActiveContractView: View {
             }
         }
     }
+
+
+    //after reveal location tap calender event create
     
     private var calendarSchedulingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -130,6 +133,10 @@ struct ActiveContractView: View {
                 .cornerRadius(12)
             }.disabled(calendarManager.eventAddedSuccessfully)
 
+
+
+
+
             if calendarManager.permissionDenied {
                 Text("Permission denied. Please enable Calendar access in iOS Settings.")
                     .font(.caption2)
@@ -157,6 +164,9 @@ struct ActiveContractView: View {
 
 
 
+
+
+
 struct WeatherForecastCard: View {
     let locationName: String
     let date: Date
@@ -177,6 +187,9 @@ struct WeatherForecastCard: View {
         .cornerRadius(16)
     }
 }
+
+
+//map show exact location with location distance
 
 struct ContractMapHeader: View {
     let buyerCoordinate: CLLocationCoordinate2D
@@ -230,7 +243,7 @@ struct ContractMapHeader: View {
         .onChange(of: isRevealed) { revealed in
             if revealed { Task { await calculateRoute() } }
         }
-        // Re-calculate when the real Firestore coordinates arrive (async fetch completes after init)
+       
         .onChange(of: sellerCoordinate.latitude) { _ in
             cameraPosition = .region(MKCoordinateRegion(center: sellerCoordinate, latitudinalMeters: 8000, longitudinalMeters: 8000))
             if isRevealed { Task { await calculateRoute() } }
@@ -274,6 +287,8 @@ struct ContractMapHeader: View {
         }
     }
 
+
+
     @MainActor
     private func applyRouteData(coordinates: [CLLocationCoordinate2D], eta: String, distance: String) {
         withAnimation(.easeInOut(duration: 1.0)) {
@@ -298,7 +313,9 @@ struct ContractMapHeader: View {
         return formatter.string(from: timeInterval) ?? ""
     }
 
-    // Straight-line distance fallback (km) — only used when Apple Maps routing fails
+    
+    //harvest calculation 
+
     private func haversineKm(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
         let R = 6371.0
         let dLat = (b.latitude  - a.latitude)  * .pi / 180
@@ -309,6 +326,8 @@ struct ContractMapHeader: View {
         return R * c
     }
 }
+
+//name and phone icon 
 
 struct SellerContactCard: View {
     let name: String
@@ -332,6 +351,10 @@ struct SellerContactCard: View {
     }
 }
 
+
+//logistic tracker 
+
+
 struct FSMTimelineTracker: View {
     let currentState: ContractState
     let isPulsing: Bool
@@ -347,6 +370,9 @@ struct FSMTimelineTracker: View {
         .padding().background(Color(UIColor.secondarySystemBackground)).cornerRadius(16)
     }
 }
+
+
+//logistic tracker timeline change 
 
 struct TimelineRow: View {
     let title: String; let subtitle: String
@@ -370,14 +396,16 @@ struct TimelineRow: View {
     }
 }
 
-// MARK: - CONTEXTUAL ACTION AREA
+
+//Escrow payment Due cardmenu 
+
 struct ContextualActionArea: View {
     @Bindable var viewModel: ActiveContractViewModel
 
     var body: some View {
         VStack(spacing: 12) {
 
-            // STEP 1 — Lock Funds (escrow simulation)
+         
             if viewModel.currentState == .bidAccepted {
                 EscrowSummaryCard(amount: viewModel.amount, sellerName: viewModel.sellerName)
 
@@ -394,7 +422,9 @@ struct ContextualActionArea: View {
                     .cornerRadius(14)
                 }
 
-            // STEP 2 — Funds locked, now reveal location
+      
+              //after locahfund escrow
+
             } else if viewModel.currentState == .fundsLocked {
                 FundsLockedBanner()
 
@@ -425,7 +455,9 @@ struct ContextualActionArea: View {
                         .cornerRadius(12)
                 }
 
-            // STEP 3 — At estate, approve or dispute
+
+            //approve or dispute
+           
             } else if viewModel.currentState == .inspectionPending {
                 Button(action: { viewModel.releaseFundsSimulation() }) {
                     Label("Approve Quality & Release Funds", systemImage: "checkmark.seal.fill")
@@ -446,7 +478,7 @@ struct ContextualActionArea: View {
                         .cornerRadius(12)
                 }
 
-            // STEP 4 — Processing
+         
             } else if viewModel.currentState == .paymentPending {
                 HStack(spacing: 12) {
                     ProgressView()
@@ -456,7 +488,7 @@ struct ContextualActionArea: View {
                 }
                 .padding()
 
-            // STEP 5 — Done
+          
             } else if viewModel.currentState == .completed {
                 VStack(spacing: 12) {
                     VStack(spacing: 8) {
@@ -492,7 +524,7 @@ struct ContextualActionArea: View {
     }
 }
 
-// MARK: - Escrow Summary Card (shown before buyer locks funds)
+// Escrow Summary Card 
 private struct EscrowSummaryCard: View {
     let amount: Double
     let sellerName: String
@@ -547,6 +579,8 @@ private struct EscrowSummaryCard: View {
 }
 
 
+//green color banner 
+
 private struct FundsLockedBanner: View {
     var body: some View {
         HStack(spacing: 12) {
@@ -569,7 +603,11 @@ private struct FundsLockedBanner: View {
     }
 }
 
-// MARK: - Reminder Option Model
+
+
+
+//remainders for calneder 
+
 private struct ReminderOption: Identifiable {
     let id:     Int
     let label:  String
@@ -583,12 +621,15 @@ private let reminderOptions: [ReminderOption] = [
     ReminderOption(id: 3, label: "24 hours before",   offset: -86400)
 ]
 
-// MARK: - Inspection Date Picker Sheet (Buyer picks preferred date/time + reminder)
+
+
+//inspection date time picker 
+
 struct InspectionDatePickerSheet: View {
     @Bindable var viewModel: ActiveContractViewModel
     @Environment(\.dismiss) private var dismiss
 
-    // Local copies — only written back to ViewModel on Confirm
+   
     @State private var localDate:           Date
     @State private var localReminderOffset: TimeInterval
 
@@ -603,7 +644,7 @@ struct InspectionDatePickerSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
 
-                    // Header
+                   
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Choose Inspection Date & Time")
                             .font(.headline)

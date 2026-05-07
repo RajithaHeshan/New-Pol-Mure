@@ -73,9 +73,7 @@ class ActivityDashboardViewModel {
     }
 
 
-
-  
-    private func attachBidsListener() {
+      private func attachBidsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingBids = true
 

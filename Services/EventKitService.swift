@@ -1,4 +1,4 @@
-// Location: New-Pol-Mure/Services/EventKitService.swift
+
 
 import Foundation
 import UIKit
@@ -9,14 +9,14 @@ import Combine
 
 class BuyerCalendarManager: ObservableObject {
 
-    // MARK: - Published State
+
     @Published var eventAddedSuccessfully = false
     @Published var permissionDenied       = false
-    @Published var reminderDateExpired    = false   // true when chosen reminder time is already past
+    @Published var reminderDateExpired    = false  
 
     private let eventStore = EKEventStore()
 
-    // MARK: - Public Entry Point
+  
     func addInspectionToCalendar(
         sellerName:       String,
         contractId:       String,
@@ -25,7 +25,7 @@ class BuyerCalendarManager: ObservableObject {
         locationName:     String,
         sellerCoordinate: CLLocationCoordinate2D,
         date:             Date,
-        reminderOffset:   TimeInterval   // negative seconds before event e.g. -3600 = 1 h before
+        reminderOffset:   TimeInterval   
     ) {
         let status = EKEventStore.authorizationStatus(for: .event)
 
@@ -62,7 +62,7 @@ class BuyerCalendarManager: ObservableObject {
         }
     }
 
-    // MARK: - Private Event Builder
+  
     private func createPickUpEvent(
         sellerName:       String,
         contractId:       String,
@@ -75,17 +75,16 @@ class BuyerCalendarManager: ObservableObject {
     ) {
         let event = EKEvent(eventStore: eventStore)
 
-        // Title: "Polmure Pick-up: Mahesh Silva"
+    
         event.title = "Polmure Pick-up: \(sellerName)"
 
-        // Use EKStructuredLocation so Apple Maps shows the pin and computes travel time
-        // without exposing raw GPS coordinates to the user
+       
         let structuredLocation = EKStructuredLocation(title: locationName.isEmpty ? "Seller's Estate" : locationName)
         structuredLocation.geoLocation = CLLocation(latitude: sellerCoordinate.latitude, longitude: sellerCoordinate.longitude)
         event.structuredLocation = structuredLocation
         event.location = locationName.isEmpty ? nil : locationName
 
-        // Notes: contract ref + volume + Rs/nut + deep link
+       
         let yieldLine = sellerYield.isEmpty ? "" : "Volume: \(sellerYield) Nuts\n"
         event.notes = """
         Contract: \(contractId)
@@ -93,12 +92,11 @@ class BuyerCalendarManager: ObservableObject {
         Open in Polmure: polmure://contract/\(contractId)
         """
 
-        // Timing — 2-hour window for inspection + handover
+       
         event.startDate = date
         event.endDate   = date.addingTimeInterval(7200)
         event.calendar  = eventStore.defaultCalendarForNewEvents
 
-        // EKAlarm — fires at buyer's chosen offset before the event
         let alarm = EKAlarm()
         alarm.relativeOffset = reminderOffset
         event.addAlarm(alarm)
@@ -107,7 +105,7 @@ class BuyerCalendarManager: ObservableObject {
             try eventStore.save(event, span: .thisEvent)
             DispatchQueue.main.async {
                 self.eventAddedSuccessfully = true
-                // Schedule UNNotification on main thread after calendar save succeeds
+               
                 self.scheduleLocalNotification(sellerName: sellerName, locationName: locationName,
                                                contractId: contractId, date: date,
                                                reminderOffset: reminderOffset)
@@ -117,8 +115,7 @@ class BuyerCalendarManager: ObservableObject {
         }
     }
 
-    // MARK: - Local Push Notification (fires at reminderOffset before inspection)
-    // Must be called on the main thread.
+
     private func scheduleLocalNotification(
         sellerName:     String,
         locationName:   String,
@@ -145,8 +142,7 @@ class BuyerCalendarManager: ObservableObject {
         content.body      = "Your inspection at \(locationLabel) (\(sellerName)) is coming up. Contract \(contractId)."
         content.sound     = .default
 
-        // UNTimeIntervalNotificationTrigger fires in exactly secondsUntil seconds —
-        // precise to the second, unlike UNCalendarNotificationTrigger (minute precision only).
+        
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: secondsUntil, repeats: false)
         let request = UNNotificationRequest(
             identifier: "pickup-reminder-\(contractId)",

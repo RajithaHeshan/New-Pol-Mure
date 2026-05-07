@@ -1,7 +1,8 @@
 import SwiftUI
 import MapKit
+import LocalAuthentication
 
-// Apple HIG minimum tap target: 44×44 points
+
 private let kMinTapSize: CGFloat = 44
 
 // MARK: - Account Root
@@ -10,6 +11,8 @@ struct ProfileView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorSchemeContrast) private var contrast
     @State private var viewModel = ProfileViewModel()
+    @AppStorage("isFaceIDEnabled") private var isFaceIDEnabled = false
+    @State private var faceIDError: String? = nil
 
     private var accentColor: Color { viewModel.isSeller ? .green : .blue }
     private var avatarBorderWidth: CGFloat { contrast == .increased ? 4 : 2.5 }
@@ -61,10 +64,10 @@ struct ProfileView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Main Account List
+  
     private var accountList: some View {
         List {
-            // MARK: Avatar Header
+           
             Section {
                 if typeSize.isAccessibilitySize {
                     VStack(spacing: 12) {
@@ -167,6 +170,55 @@ struct ProfileView: View {
                 }
             } header: {
                 Text("Account")
+            }
+
+            // MARK: Security Section
+            Section {
+                HStack(spacing: 14) {
+                    Image(systemName: "faceid")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 30, height: 30)
+                        .background(Color.polmureEmerald)
+                        .cornerRadius(7)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Face ID")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Text("Unlock app with Face ID")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: Binding(
+                        get: { isFaceIDEnabled },
+                        set: { newValue in
+                            if newValue {
+                                enrollFaceID()
+                            } else {
+                                isFaceIDEnabled = false
+                            }
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(.polmureEmerald)
+                }
+                .frame(minHeight: kMinTapSize)
+                .contentShape(Rectangle())
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Face ID")
+                .accessibilityValue(isFaceIDEnabled ? "On" : "Off")
+                .accessibilityHint("Toggle to enable or disable Face ID unlock")
+
+                if let error = faceIDError {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .accessibilityLabel(error)
+                }
+            } header: {
+                Text("Security")
             }
 
             // MARK: Sign Out
@@ -281,6 +333,35 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity, minHeight: kMinTapSize, alignment: .leading)
                 .contentShape(Rectangle())
                 .padding(.vertical, 4)
+            }
+        }
+    }
+
+    private func enrollFaceID() {
+        faceIDError = nil
+
+        #if targetEnvironment(simulator)
+        isFaceIDEnabled = true
+        return
+        #endif
+
+        let context = LAContext()
+        var nsError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
+            faceIDError = "Face ID is not available on this device."
+            return
+        }
+        context.evaluatePolicy(
+            .deviceOwnerAuthenticationWithBiometrics,
+            localizedReason: "Confirm to enable Face ID unlock for Polmure"
+        ) { success, _ in
+            Task { @MainActor in
+                if success {
+                    isFaceIDEnabled = true
+                } else {
+                    isFaceIDEnabled = false
+                    faceIDError = "Face ID verification failed. Try again."
+                }
             }
         }
     }
@@ -723,7 +804,7 @@ struct LocationEditView: View {
     }
 }
 
-// MARK: - Shared helper row builder
+
 private func editRow<Content: View>(
     icon: String,
     label: String,

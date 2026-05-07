@@ -36,7 +36,7 @@ struct SellerActivityDashboardView: View {
                             ForEach(viewModel.myOffers) { offer in
                                 SellerPendingPitchRow(
                                     buyerName: offer.buyerName.isEmpty ? offer.buyerID : offer.buyerName,
-                                    location: "",
+                                    placedAt: offer.placedAt,
                                     currentOffer: offer.amount,
                                     isHighest: viewModel.isHighest(offer: offer),
                                     isUrgent: offer.isUrgentPitch
@@ -114,7 +114,10 @@ struct SellerActivityDashboardView: View {
                             SellerEmptyActivityView(message: "No active contracts.")
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
-                        } else {
+
+
+                                
+                        } else { //navigate contract view
                             ForEach(viewModel.contracts) { contract in
                                 NavigationLink(destination: SellerContractView(contract: contract)) {
                                     SellerContractRow(
@@ -169,13 +172,20 @@ struct SellerEmptyActivityView: View {
 
 struct SellerPendingPitchRow: View {
     let buyerName: String
-    let location: String
+    let placedAt: Date
     let currentOffer: Double
     let isHighest: Bool
     var isUrgent: Bool = false
 
+    private var formattedDate: String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: placedAt)
+    }
+
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     if isUrgent {
@@ -186,17 +196,10 @@ struct SellerPendingPitchRow: View {
                     Text(buyerName)
                         .font(.headline)
                 }
-                if !location.isEmpty {
-                    HStack {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(location)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                HStack {
+                Text(formattedDate)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
                     Circle()
                         .fill(isHighest ? Color.green : Color.red)
                         .frame(width: 8, height: 8)
@@ -275,6 +278,16 @@ struct SellerDirectBidRow: View {
             
             if bid.status == "pending" {
                 HStack(spacing: 12) {
+                    Button(action: onAccept) {
+                        Text("Accept Bid")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.orange)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                    }
+
                     Button(action: onDecline) {
                         Text("Decline")
                             .font(.subheadline.bold())
@@ -282,16 +295,6 @@ struct SellerDirectBidRow: View {
                             .padding(.vertical, 10)
                             .background(Color.red.opacity(0.1))
                             .foregroundColor(.red)
-                            .cornerRadius(8)
-                    }
-
-                    Button(action: onAccept) {
-                        Text("Accept Bid")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.orange) // Orange Theme
-                            .foregroundColor(.white)
                             .cornerRadius(8)
                     }
                 }

@@ -8,13 +8,12 @@ import Combine
 
 class CalendarManager: ObservableObject {
 
-    // MARK: - Published State
     @Published var eventAddedSuccessfully = false
     @Published var permissionDenied       = false
 
     private let eventStore = EKEventStore()
 
-    // MARK: - Public Entry Point
+   
     func addInspectionToCalendar(
         buyerName:        String,
         contractId:       String,
@@ -56,7 +55,7 @@ class CalendarManager: ObservableObject {
         }
     }
 
-    // MARK: - Private Event Builder
+   
     private func createBuyerArrivalEvent(
         buyerName:        String,
         contractId:       String,
@@ -67,7 +66,7 @@ class CalendarManager: ObservableObject {
     ) {
         let event = EKEvent(eventStore: eventStore)
 
-        // Title: "Buyer Arriving: Nimal's Bakery"
+        
         event.title = "Buyer Arriving: \(buyerName)"
 
         // Use EKStructuredLocation so Apple Maps shows the pin without exposing raw GPS coordinates
@@ -84,17 +83,17 @@ class CalendarManager: ObservableObject {
         Prepare harvest: pile and grade coconuts before buyer arrives.
         """
 
-        // Timing — 2-hour window for inspection + handover
+       
         event.startDate = date
         event.endDate   = date.addingTimeInterval(7200)
         event.calendar  = eventStore.defaultCalendarForNewEvents
 
-        // Alarm 1 — 24 hours before: "Prepare the harvest pile"
+        
         let prepAlarm = EKAlarm()
         prepAlarm.relativeOffset = -86400
         event.addAlarm(prepAlarm)
 
-        // Alarm 2 — 1 hour before: final readiness check
+      
         let readyAlarm = EKAlarm()
         readyAlarm.relativeOffset = -3600
         event.addAlarm(readyAlarm)

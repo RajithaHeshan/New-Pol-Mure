@@ -43,8 +43,8 @@ final class RecommendationEngine {
         return max(0, min(100, score))
     }
 
-    // MARK: - Seller → Buyer Score
-    // Same model, roles swapped: seller is the "supply" side, buyer is the "demand" side.
+    
+
     func scoreBuyerForSeller(
         sellerVolume: Int,
         buyerVolume: Int,
@@ -88,8 +88,7 @@ final class RecommendationEngine {
         return max(0, 100 - km * 0.5)
     }
 
-    // MARK: - Volume Parsing Utility
-    // Parses strings like "5000", "5K - 10K Nuts", "5,000" → integer nut count (midpoint for ranges)
+    
     static func parseVolume(_ text: String) -> Int {
         let cleaned = text
             .replacingOccurrences(of: ",", with: "")

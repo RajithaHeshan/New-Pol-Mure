@@ -177,7 +177,9 @@ class SellerContractViewModel {
             }
     }
 
-    // MARK: - Accept New Price (resolve dispute)
+
+
+
     func acceptNewPrice() {
         Task {
             do {
@@ -208,7 +210,7 @@ class SellerContractViewModel {
         }
     }
 
-    // MARK: - Cancel Contract
+ 
     func cancelContract() {
         isCancellingContract = true
         Task {
@@ -224,27 +226,29 @@ class SellerContractViewModel {
         }
     }
 
-    // MARK: - Confirm Handover → triggers escrow release
+
+    //confirmed handover escrow released 
+
     func confirmHandover() {
         isConfirmingHandover = true
         Task {
             do {
                 let db = Firestore.firestore()
 
-                // Advance FSM to qualityApproved
+              
                 try await db.collection("contracts").document(contractID)
                     .updateData(["status": "payment"])
 
                 withAnimation { currentState = .qualityApproved }
 
-                // Simulate brief escrow processing then mark completed
+
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
 
                 try await db.collection("contracts").document(contractID)
                     .updateData(["status": "completed"])
 
                 withAnimation(.spring()) { currentState = .completed }
-                // Prompt seller to rate the buyer
+              
                 showRatingSheet = true
             } catch {
                 print("Confirm handover error: \(error.localizedDescription)")
@@ -252,6 +256,9 @@ class SellerContractViewModel {
             isConfirmingHandover = false
         }
     }
+
+
+
 
     // MARK: - Fetch seller's display name for the rating sheet reviewer label
     private func fetchSellerDisplayName(sellerID: String) {

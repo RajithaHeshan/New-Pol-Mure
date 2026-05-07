@@ -1,4 +1,3 @@
-// Location: New-Pol-Mure/Models/ContractState.swift
 
 import Foundation
 

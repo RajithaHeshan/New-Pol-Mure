@@ -15,13 +15,13 @@ private final class ContractListenerBox {
 @MainActor
 class ActiveContractViewModel {
 
-    // MARK: - FSM State
+
     var currentState: ContractState = .bidAccepted
     var isLocationRevealed = false
     var showDisputeModal   = false
     var isPulsing          = false
 
-    // MARK: - Contract Identity (passed in from the Contracts list)
+    
     let contractID:  String
     let contractRef: String
     let sellerName:  String
@@ -36,14 +36,14 @@ class ActiveContractViewModel {
     var sellerYield:        String = ""
     let amount:      Double
 
-    // MARK: - Location (fetched from Firestore seller profile)
+    
     var buyerCoordinate:  CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612)
     var sellerCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
 
-    // Persisted in Firestore — written when buyer confirms inspection date
+   
     var inspectionDate: Date = Date().addingTimeInterval(86400)
 
-    // MARK: - Date Picker eventkit 
+    
     var showDatePicker        = false
     var pendingPickerDate:    Date         = Date().addingTimeInterval(3600)   // default: 1 hour from now
     // Reminder offset in seconds — buyer selects how far ahead to be notified
@@ -70,16 +70,18 @@ class ActiveContractViewModel {
         self.contractSource       = contract.source
         self.amount               = contract.amount
 
-        self.currentState       = Self.mapStatus(contract.status)
-        self.isLocationRevealed = contract.status == "inspection" || contract.status == "dispute" || contract.status == "qualityApproved" || contract.status == "payment" || contract.status == "completed"
+        self.currentState       = Self.mapStatus(contract.status) 
+        self.isLocationRevealed = contract.status == "inspection" || contract.status == "dispute" || contract.status == "qualityApproved" || contract.status == "payment" || contract.status == "completed"  //map unlocked status
 
+       
+       
+       
         if let savedDate = contract.inspectionDate {
             self.inspectionDate    = savedDate
-            self.pendingPickerDate = savedDate > Date() ? savedDate : Date().addingTimeInterval(3600)
+            self.pendingPickerDate = savedDate > Date() ? savedDate : Date().addingTimeInterval(3600) //don't espect inspection status
         }
 
-        // If contract was from a harvest bid, seed the harvest's exact coordinates directly.
-        // fetchSellerProfile will still run to get phone/yield, but won't overwrite coordinates.
+       
         if let lat = contract.harvestLatitude, let lng = contract.harvestLongitude {
             self.sellerCoordinate = CLLocationCoordinate2D(latitude: lat, longitude: lng)
         }
@@ -89,13 +91,14 @@ class ActiveContractViewModel {
         fetchBuyerDisplayName(buyerID: contract.buyerID)
         attachContractListener()
 
-        // If already completed when opened, check if buyer has already rated
+       
+       //if buyer complete the contract can rate it 
         if contract.status == "completed" {
             checkIfAlreadyRated()
         }
     }
 
-    // MARK: - Real-Time Contract Listener
+   
     private func attachContractListener() {
         contractListenerBox.listener = Firestore.firestore()
             .collection("contracts")
@@ -110,7 +113,7 @@ class ActiveContractViewModel {
                     }
                 }
 
-                // Sync inspection date — if stored date is in the past, reset to 1 hour from now
+               
                 if let ts = data["inspectionDate"] as? Timestamp {
                     let stored = ts.dateValue()
                     self.inspectionDate    = stored
@@ -119,7 +122,9 @@ class ActiveContractViewModel {
             }
     }
 
-    // MARK: - Firestore status string → FSM state
+
+
+
     private static func mapStatus(_ status: String) -> ContractState {
         switch status {
         case "escrow":          return .bidAccepted
@@ -133,7 +138,8 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Lock Funds → buyer confirms escrow, advances contract to fundsLocked
+    //escrow
+
     func lockFunds() {
         withAnimation(.spring()) { currentState = .fundsLocked }
         Task {
@@ -144,8 +150,10 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Fetch Seller Profile: phone, yield, and optionally coordinates
-    // useProfileCoordinate = false when the contract already has harvest coordinates
+    
+    //seller profile
+
+
     private func fetchSellerProfile(sellerID: String, useProfileCoordinate: Bool = true) {
         Task {
             let doc = try? await Firestore.firestore()
@@ -154,8 +162,7 @@ class ActiveContractViewModel {
                 .getDocument()
             guard let data = doc?.data() else { return }
 
-            // Only overwrite sellerCoordinate with the seller's home location
-            // when this is a direct registered-seller bid (not a harvest bid).
+            
             if useProfileCoordinate,
                let lat = data["latitude"] as? Double,
                let lng = data["longitude"] as? Double {
@@ -173,7 +180,7 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Fetch Buyer Coordinate for route origin
+   
     private func fetchBuyerCoordinate(buyerID: String) {
         Task {
             let doc = try? await Firestore.firestore()
@@ -191,7 +198,7 @@ class ActiveContractViewModel {
 
     // MARK: - Reveal Location → buyer confirms chosen date, advances contract to inspection
     func revealLocation() {
-        // Use the date the buyer selected in the picker
+       
         inspectionDate = pendingPickerDate
 
         withAnimation { isLocationRevealed = true }
@@ -207,7 +214,7 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Update Inspection Date (called when buyer changes date after reveal)
+    // Update Inspection Date 
     func updateInspectionDate(_ date: Date) {
         inspectionDate = date
         Task {
@@ -218,7 +225,10 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Approve Quality → advances contract and writes completed transactions for both parties
+    
+
+    //  Approve Quality escrow simulation 
+
     func releaseFundsSimulation() {
         isReleasingFunds = true
         withAnimation { currentState = .paymentPending }
@@ -269,12 +279,12 @@ class ActiveContractViewModel {
                 .updateData(["status": "qualityApproved"])
 
             isReleasingFunds = false
-            // Prompt buyer to rate the seller
+          
             showRatingSheet = true
         }
     }
 
-    // MARK: - Fetch buyer's display name for the rating sheet reviewer label
+    // Fetch buyer's display name for the rating sheet reviewer label
     private func fetchBuyerDisplayName(buyerID: String) {
         Task {
             let doc = try? await Firestore.firestore()
@@ -285,7 +295,7 @@ class ActiveContractViewModel {
         }
     }
 
-    // MARK: - Check if buyer already rated this contract (prevents duplicate sheet on re-open)
+    // Check if buyer already rated this contract (prevents duplicate sheet on re-open)
     private func checkIfAlreadyRated() {
         Task {
             let snapshot = try? await Firestore.firestore()

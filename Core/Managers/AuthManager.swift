@@ -75,14 +75,14 @@ class AuthManager {
     }
     
 
-    // Reads userId from Core Data — available immediately on launch without waiting for Firebase Auth.
+   
     var currentUserID: String {
         let request: NSFetchRequest<LocalSession> = LocalSession.fetchRequest()
         let results = try? context.fetch(request)
         return results?.first?.userId ?? Auth.auth().currentUser?.uid ?? ""
     }
 
-    // Called after Face ID succeeds — refreshes Core Data so currentUserID is valid
+   
     func refreshSession(userId: String, role: String) {
         saveLocalSession(userId: userId, role: role)
     }
