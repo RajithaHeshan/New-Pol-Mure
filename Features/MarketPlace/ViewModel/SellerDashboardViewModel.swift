@@ -22,6 +22,7 @@ class SellerDashboardViewModel {
     var showProfile = false
     var showNotifications = false
     var unreadNotificationCount: Int = 0
+    var currentUserID: String { AuthManager.shared.currentUserID }
 
 
     var profileImageName: String = "Gemini_Generated_Image_bvc5lzbvc5lzbvc5"
@@ -60,6 +61,11 @@ class SellerDashboardViewModel {
     // Internal cache — merged from two separate Firestore listeners
     private var disputeContract:  Contract? = nil
     private var approvedContract: Contract? = nil
+
+    // Fetched dispute details for the banner
+    var disputeReason: String? = nil
+    var disputeNotes: String? = nil
+    var disputeCounterOffer: Double? = nil
 
     // MARK: - Seller Profile (used by ML engine)
     private var sellerVolume: Int = 5000
@@ -191,16 +197,70 @@ class SellerDashboardViewModel {
     private func updateUrgentBanner() {
         if let contract = disputeContract {
             urgentContract = contract
-            urgentContractMessage = "Buyer raised a dispute on Contract \(contract.contractRef). Review and respond."
+            urgentContractMessage = "Buyer raised a dispute on Contract \(contract.contractRef). Fetching details..."
             unreadNotificationCount = 1
+            fetchDisputeDetails(for: contract.id)
         } else if let contract = approvedContract {
             urgentContract = contract
             urgentContractMessage = "Buyer approved quality on Contract \(contract.contractRef). Confirm handover to release funds."
+            disputeReason = nil
+            disputeNotes = nil
+            disputeCounterOffer = nil
             unreadNotificationCount = 1
         } else {
             urgentContract = nil
             urgentContractMessage = nil
+            disputeReason = nil
+            disputeNotes = nil
+            disputeCounterOffer = nil
             unreadNotificationCount = 0
+        }
+    }
+
+    private func fetchDisputeDetails(for contractID: String) {
+        Task {
+            do {
+                // No order(by:) — avoids composite index requirement
+                let snapshot = try await Firestore.firestore()
+                    .collection("disputes")
+                    .whereField("contractID", isEqualTo: contractID)
+                    .whereField("status", isEqualTo: "pending")
+                    .getDocuments()
+
+                // Pick the most recent by sorting in Swift
+                let doc = snapshot.documents.max {
+                    let a = ($0.data()["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
+                    let b = ($1.data()["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
+                    return a < b
+                }
+                guard let doc else {
+                    if let contract = self.disputeContract {
+                        self.urgentContractMessage = "Buyer raised a dispute on Contract \(contract.contractRef). Review and respond."
+                    }
+                    return
+                }
+                let data = doc.data()
+
+                let reason  = data["reason"] as? String ?? ""
+                let notes   = data["notes"]  as? String ?? ""
+                let counter = data["counterOfferAmount"] as? Double ?? 0
+
+                self.disputeReason       = reason.isEmpty ? nil : reason
+                self.disputeNotes        = notes.isEmpty  ? nil : notes
+                self.disputeCounterOffer = counter > 0    ? counter : nil
+
+                if let contract = self.disputeContract {
+                    var msg = "Dispute on Contract \(contract.contractRef)"
+                    if !reason.isEmpty { msg += ": \(reason)" }
+                    if !notes.isEmpty  { msg += " — \(notes)" }
+                    if counter > 0     { msg += ". Counter-offer: Rs \(Int(counter))" }
+                    self.urgentContractMessage = msg
+                }
+            } catch {
+                if let contract = self.disputeContract {
+                    self.urgentContractMessage = "Buyer raised a dispute on Contract \(contract.contractRef). Review and respond."
+                }
+            }
         }
     }
 

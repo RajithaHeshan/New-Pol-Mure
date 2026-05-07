@@ -20,6 +20,7 @@ class ActiveContractViewModel {
     var isLocationRevealed = false
     var showDisputeModal   = false
     var isPulsing          = false
+    var isDisputePending   = false   // true while seller hasn't responded yet
 
     
     let contractID:  String
@@ -70,8 +71,9 @@ class ActiveContractViewModel {
         self.contractSource       = contract.source
         self.amount               = contract.amount
 
-        self.currentState       = Self.mapStatus(contract.status) 
-        self.isLocationRevealed = contract.status == "inspection" || contract.status == "dispute" || contract.status == "qualityApproved" || contract.status == "payment" || contract.status == "completed"  //map unlocked status
+        self.currentState       = Self.mapStatus(contract.status)
+        self.isDisputePending   = contract.status == "dispute"
+        self.isLocationRevealed = contract.status == "inspection" || contract.status == "dispute" || contract.status == "qualityApproved" || contract.status == "payment" || contract.status == "completed"
 
        
        
@@ -109,6 +111,7 @@ class ActiveContractViewModel {
                 if let status = data["status"] as? String {
                     withAnimation(.spring()) {
                         self.currentState       = Self.mapStatus(status)
+                        self.isDisputePending   = status == "dispute"
                         self.isLocationRevealed = status == "inspection" || status == "dispute" || status == "qualityApproved" || status == "payment" || status == "completed"
                     }
                 }

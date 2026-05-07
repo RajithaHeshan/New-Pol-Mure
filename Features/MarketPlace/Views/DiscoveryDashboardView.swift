@@ -274,11 +274,11 @@ struct DiscoveryDashboardView: View {
     }
 
     private var notificationsSheet: some View {
-        NavigationStack {
-            Text("Notifications Placeholder")
-                .navigationTitle("Notifications").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { viewModel.showNotifications = false } } }
-        }
+        NotificationsView(
+            ownerID: viewModel.currentUserID,
+            accentColor: .blue,
+            onDismiss: { viewModel.showNotifications = false }
+        )
     }
 }
 

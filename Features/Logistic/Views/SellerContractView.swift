@@ -24,13 +24,15 @@ struct SellerContractView: View {
                         ContractSummaryCard(buyerName: viewModel.buyerName, amount: viewModel.amount, volume: viewModel.buyerVolume)
                             .padding(.horizontal)
 
-                      
+
                         if viewModel.isDisputed {
                             SellerDisputeAlertCard(
+                                reason:        viewModel.disputeReason,
+                                notes:         viewModel.disputeNotes,
                                 originalPrice: viewModel.originalPrice,
-                                counterOffer: viewModel.counterOffer,
-                                onAccept:  { viewModel.acceptNewPrice() },
-                                onCancel:  { viewModel.cancelContract() }
+                                counterOffer:  viewModel.counterOffer,
+                                onAccept:      { viewModel.acceptNewPrice() },
+                                onCancel:      { viewModel.cancelContract() }
                             )
                             .padding(.horizontal)
                         }
@@ -210,6 +212,8 @@ struct ContractSummaryCard: View {
 }
 
 struct SellerDisputeAlertCard: View {
+    let reason:        String
+    let notes:         String
     let originalPrice: Double
     let counterOffer:  Double
     let onAccept:      () -> Void
@@ -222,8 +226,25 @@ struct SellerDisputeAlertCard: View {
                 Text("Buyer Initiated Dispute").font(.headline).foregroundColor(.red)
             }
 
-            Text("The buyer reported: 'Quality (Rotten/Spoiled)' and has proposed a new price to complete the deal.")
-                .font(.subheadline)
+            // Dynamic reason + notes
+            VStack(alignment: .leading, spacing: 6) {
+                if !reason.isEmpty {
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("Issue:").font(.caption.bold()).foregroundColor(.secondary).frame(width: 44, alignment: .leading)
+                        Text(reason).font(.subheadline)
+                    }
+                }
+                if !notes.isEmpty {
+                    HStack(alignment: .top, spacing: 6) {
+                        Text("Notes:").font(.caption.bold()).foregroundColor(.secondary).frame(width: 44, alignment: .leading)
+                        Text(notes).font(.subheadline).foregroundColor(.secondary)
+                    }
+                }
+                if reason.isEmpty && notes.isEmpty {
+                    Text("The buyer has raised a dispute and proposed a new price to complete the deal.")
+                        .font(.subheadline)
+                }
+            }
 
             HStack {
                 VStack(alignment: .leading) {

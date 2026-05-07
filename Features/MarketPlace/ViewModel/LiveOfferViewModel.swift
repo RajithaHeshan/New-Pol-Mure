@@ -141,17 +141,21 @@ class LiveOfferViewModel {
 
     private func scheduleNewOfferNotification(amount: Double) {
         let buyerID = buyer.id
+        let title   = "New Offer Received!"
+        let body    = "\(self.currentSellerName) pitched Rs \(String(format: "%.0f", amount)) to you. Review it in Activity → Offers."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: "offer")
+        }
+
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
             let content = UNMutableNotificationContent()
-            content.title = "New Offer Received!"
-            content.body  = "\(self.currentSellerName) pitched Rs \(String(format: "%.0f", amount)) to you. Review it in Activity → Offers."
+            content.title = title
+            content.body  = body
             content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: "newoffer-\(buyerID)-\(Date().timeIntervalSince1970)",
-                content: content, trigger: nil
-            )
-            UNUserNotificationCenter.current().add(request) { error in  //call new offer notifcation 
+            let request = UNNotificationRequest(identifier: "newoffer-\(buyerID)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
                 if let error { print("New offer notification error: \(error.localizedDescription)") }
             }
         }
@@ -161,16 +165,20 @@ class LiveOfferViewModel {
     private func scheduleOutpitchedNotification(newAmount: Double, sellerName: String) {
         let buyerName = buyer.name
         let buyerID   = buyer.id
+        let title     = "You've Been Outpitched!"
+        let body      = "\(sellerName) offered Rs \(String(format: "%.0f", newAmount)) to \(buyerName). Pitch higher to stay in."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: "outpitched")
+        }
+
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
             let content = UNMutableNotificationContent()
-            content.title = "You've Been Outpitched!"
-            content.body  = "\(sellerName) offered Rs \(String(format: "%.0f", newAmount)) to \(buyerName). Pitch higher to stay in."
+            content.title = title
+            content.body  = body
             content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: "outpitched-\(buyerID)-\(Date().timeIntervalSince1970)",
-                content: content, trigger: nil
-            )
+            let request = UNNotificationRequest(identifier: "outpitched-\(buyerID)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error { print("Notification error: \(error.localizedDescription)") }
             }

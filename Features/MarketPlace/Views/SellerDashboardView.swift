@@ -39,7 +39,13 @@ struct SellerDashboardView: View {
                     .padding(.top, 10)
 
                     if let message = viewModel.urgentContractMessage {
-                        UrgentActionBanner(message: message) {
+                        UrgentActionBanner(
+                            message: message,
+                            isDispute: viewModel.disputeReason != nil,
+                            disputeReason: viewModel.disputeReason,
+                            disputeNotes: viewModel.disputeNotes,
+                            disputeCounterOffer: viewModel.disputeCounterOffer
+                        ) {
                             navigateToContract = viewModel.urgentContract
                         }
                         .padding(.horizontal)
@@ -254,12 +260,11 @@ struct SellerDashboardView: View {
                 ProfileView()
             }
             .sheet(isPresented: $viewModel.showNotifications) {
-                NavigationStack {
-                    Text("Notifications Placeholder")
-                        .navigationTitle("Notifications")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { viewModel.showNotifications = false } } }
-                }
+                NotificationsView(
+                    ownerID: viewModel.currentUserID,
+                    accentColor: .green,
+                    onDismiss: { viewModel.showNotifications = false }
+                )
             }
             .sheet(isPresented: $viewModel.isFullScreenMapPresented) {
                 SellerFullScreenLocationPicker(searchCenter: $viewModel.searchCenter, searchRadius: $viewModel.searchRadius, buyers: viewModel.allBuyers)

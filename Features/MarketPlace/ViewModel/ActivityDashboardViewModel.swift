@@ -293,24 +293,24 @@ class ActivityDashboardViewModel {
 
   
     private func scheduleNewOfferNotification(offer: Offer) {
+        let title = "New Pitch from a Seller!"
+        let body  = "\(offer.sellerName) offered Rs \(String(format: "%.0f", offer.amount)). Tap to Accept or Decline in Activity → Offers."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: "offer")
+        }
+
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
-
             let content = UNMutableNotificationContent()
-            content.title = "New Pitch from a Seller!"
-            content.body  = "\(offer.sellerName) offered Rs \(String(format: "%.0f", offer.amount)). Tap to Accept or Decline in Activity → Offers."
+            content.title = title
+            content.body  = body
             content.sound = .default
-
-            let request = UNNotificationRequest(
-                identifier: "inbound-offer-\(offer.id)",
-                content: content,
-                trigger: nil
-            )
+            let request = UNNotificationRequest(identifier: "inbound-offer-\(offer.id)", content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error { print("Inbound offer notification error: \(error.localizedDescription)") }
             }
         }
-
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 

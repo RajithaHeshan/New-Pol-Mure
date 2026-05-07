@@ -57,27 +57,47 @@ struct MetricCard: View {
 
 struct UrgentActionBanner: View {
     let message: String
+    var isDispute: Bool = false
+    var disputeReason: String? = nil
+    var disputeNotes: String? = nil
+    var disputeCounterOffer: Double? = nil
     let onVerify: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
-                Text("Action Required")
+                Image(systemName: isDispute ? "exclamationmark.shield.fill" : "exclamationmark.triangle.fill")
+                    .foregroundColor(isDispute ? .red : .orange)
+                Text(isDispute ? "Dispute Raised" : "Action Required")
                     .font(.subheadline.bold())
+                    .foregroundColor(isDispute ? .red : .primary)
                 Spacer()
             }
 
             Text(message)
                 .font(.subheadline)
 
+            if isDispute, let reason = disputeReason {
+                VStack(alignment: .leading, spacing: 6) {
+                    DisputeDetailRow(label: "Reason", value: reason)
+                    if let notes = disputeNotes {
+                        DisputeDetailRow(label: "Notes", value: notes)
+                    }
+                    if let counter = disputeCounterOffer {
+                        DisputeDetailRow(label: "Counter-Offer", value: "Rs \(Int(counter))")
+                    }
+                }
+                .padding(10)
+                .background(Color.red.opacity(0.06))
+                .cornerRadius(10)
+            }
+
             Button(action: onVerify) {
-                Text("Verify Quality")
+                Text(isDispute ? "Review Dispute" : "Verify Quality")
                     .font(.subheadline.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.orange)
+                    .background(isDispute ? Color.red : Color.orange)
                     .foregroundColor(.white)
                     .cornerRadius(12)
             }
@@ -87,8 +107,26 @@ struct UrgentActionBanner: View {
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                .stroke((isDispute ? Color.red : Color.orange).opacity(0.5), lineWidth: 1)
         )
+    }
+}
+
+private struct DisputeDetailRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            Text("\(label):")
+                .font(.caption.bold())
+                .foregroundColor(.secondary)
+                .frame(width: 80, alignment: .leading)
+            Text(value)
+                .font(.caption)
+                .foregroundColor(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

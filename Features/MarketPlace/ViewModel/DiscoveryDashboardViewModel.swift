@@ -18,6 +18,7 @@ class DiscoveryDashboardViewModel {
     var showProfile = false
     var showNotifications = false
     var unreadNotificationCount = 3
+    var currentUserID: String { AuthManager.shared.currentUserID }
 
    
     var profileImageName: String = "Gemini_Generated_Image_l5uvm3l5uvm3l5uv"

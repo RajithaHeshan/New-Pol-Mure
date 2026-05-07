@@ -286,24 +286,24 @@ class SellerActivityDashboardViewModel {
    //bids alert for sellers 
 
     private func scheduleNewBidNotification(bid: Bid) {
+        let title = "New Bid on Your Harvest!"
+        let body  = "\(bid.bidderName) placed Rs \(String(format: "%.0f", bid.amount)). Tap to Accept or Decline in Activity → Direct Bids."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: "bid")
+        }
+
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
-
             let content = UNMutableNotificationContent()
-            content.title = "New Bid on Your Harvest!"
-            content.body  = "\(bid.bidderName) placed Rs \(String(format: "%.0f", bid.amount)). Tap to Accept or Decline in Activity → Direct Bids."
+            content.title = title
+            content.body  = body
             content.sound = .default
-
-            let request = UNNotificationRequest(
-                identifier: "inbound-bid-\(bid.id)",
-                content: content,
-                trigger: nil
-            )
+            let request = UNNotificationRequest(identifier: "inbound-bid-\(bid.id)", content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error { print("Inbound bid notification error: \(error.localizedDescription)") }
             }
         }
-
         UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 

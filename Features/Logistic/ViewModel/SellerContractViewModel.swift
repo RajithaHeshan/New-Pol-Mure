@@ -18,9 +18,11 @@ class SellerContractViewModel {
     var currentState: SellerContractState = .escrowSecured
 
    
-    var isDisputed    = false
-    var counterOffer:  Double = 0
-    var originalPrice: Double = 0
+    var isDisputed      = false
+    var counterOffer:   Double = 0
+    var originalPrice:  Double = 0
+    var disputeReason:  String = ""
+    var disputeNotes:   String = ""
 
     
     let contractID:  String
@@ -166,13 +168,23 @@ class SellerContractViewModel {
                     return
                 }
 
-                if let doc = snapshot?.documents.first {
+                // Pick the most recent pending dispute without requiring a composite index
+                let doc = snapshot?.documents.max {
+                    let a = ($0.data()["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
+                    let b = ($1.data()["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
+                    return a < b
+                }
+                if let doc {
                     let data = doc.data()
                     self.counterOffer  = data["counterOfferAmount"] as? Double ?? 0
                     self.originalPrice = data["originalAmount"]     as? Double ?? self.amount
+                    self.disputeReason = data["reason"] as? String ?? ""
+                    self.disputeNotes  = data["notes"]  as? String ?? ""
                     self.isDisputed    = true
                 } else {
-                    self.isDisputed = false
+                    self.isDisputed    = false
+                    self.disputeReason = ""
+                    self.disputeNotes  = ""
                 }
             }
     }

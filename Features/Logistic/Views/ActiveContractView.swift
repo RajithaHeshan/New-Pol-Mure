@@ -457,7 +457,30 @@ struct ContextualActionArea: View {
 
 
             //approve or dispute
-           
+
+            } else if viewModel.currentState == .inspectionPending && viewModel.isDisputePending {
+                // Dispute submitted — waiting for seller to respond
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "clock.badge.exclamationmark.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Dispute Submitted")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.orange)
+                            Text("Waiting for the seller to review your dispute and respond.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.08))
+                    .cornerRadius(14)
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange.opacity(0.25), lineWidth: 1))
+                }
+
             } else if viewModel.currentState == .inspectionPending {
                 Button(action: { viewModel.releaseFundsSimulation() }) {
                     Label("Approve Quality & Release Funds", systemImage: "checkmark.seal.fill")

@@ -148,16 +148,20 @@ class LiveBiddingViewModel {
 
     private func scheduleNewBidNotification(amount: Double) {
         let lotID = lot.id
+        let title = "New Bid Received!"
+        let body  = "\(self.currentBuyerName) placed Rs \(String(format: "%.0f", amount)) on your lot. Review it in Activity → Direct Bids."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: "bid")
+        }
+
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
             let content = UNMutableNotificationContent()
-            content.title = "New Bid Received!"
-            content.body  = "\(self.currentBuyerName) placed Rs \(String(format: "%.0f", amount)) on your lot. Review it in Activity → Direct Bids."
+            content.title = title
+            content.body  = body
             content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: "newbid-\(lotID)-\(Date().timeIntervalSince1970)",
-                content: content, trigger: nil
-            )
+            let request = UNNotificationRequest(identifier: "newbid-\(lotID)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error { print("New bid notification error: \(error.localizedDescription)") }
             }
@@ -165,19 +169,23 @@ class LiveBiddingViewModel {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {  //exceed bid 
+    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
         let sellerName = lot.sellerInitial
         let lotID = lot.id
+        let title = "You've Been Outbid!"
+        let body  = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: "outbid")
+        }
+
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             guard settings.authorizationStatus == .authorized else { return }
             let content = UNMutableNotificationContent()
-            content.title = "You've Been Outbid!"
-            content.body  = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
+            content.title = title
+            content.body  = body
             content.sound = .default
-            let request = UNNotificationRequest(
-                identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)",
-                content: content, trigger: nil
-            )
+            let request = UNNotificationRequest(identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
             UNUserNotificationCenter.current().add(request) { error in
                 if let error { print("Notification error: \(error.localizedDescription)") }
             }
