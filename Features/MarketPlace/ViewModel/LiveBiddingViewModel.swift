@@ -74,7 +74,7 @@ class LiveBiddingViewModel {
 
 
 
-                if self.isFirstSnapshot {  //initial login 
+                if self.isFirstSnapshot {  //initial login prevnt existing bids
                     self.currentHighestBid = topBid.amount
                     self.currentHighestBidderID = topBid.bidderID
                     self.isFirstSnapshot = false //login initially no outbid notifcation 
@@ -86,7 +86,7 @@ class LiveBiddingViewModel {
                 self.currentHighestBidderID = topBid.bidderID
 
                 if topBid.bidderID == self.currentBuyerID {
-                    self.isOutbid = false
+                    self.isOutbid = false  //leader no warring 
                     return
                 }
 

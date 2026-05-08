@@ -143,7 +143,6 @@ struct SellerActivityDashboardView: View {
                 .scrollContentBackground(.hidden)
             }
             .navigationTitle("My Activity")
-            // Apply Orange Tint to the Segmented Picker
             .tint(.orange)
         }
     }

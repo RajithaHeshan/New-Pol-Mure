@@ -5,6 +5,7 @@ import MapKit
 struct SellerDashboardView: View {
     @State private var viewModel = SellerDashboardViewModel()
     @State private var navigateToContract: Contract? = nil
+    @State private var miniMapCamera: MapCameraPosition = .automatic
 
     var body: some View {
         NavigationStack {
@@ -37,6 +38,9 @@ struct SellerDashboardView: View {
                     }
                     .padding(.horizontal)
                     .padding(.top, 10)
+                    
+                    
+                    //dispute cardmenu
 
                     if let message = viewModel.urgentContractMessage {
                         UrgentActionBanner(
@@ -46,7 +50,7 @@ struct SellerDashboardView: View {
                             disputeNotes: viewModel.disputeNotes,
                             disputeCounterOffer: viewModel.disputeCounterOffer
                         ) {
-                            navigateToContract = viewModel.urgentContract
+                            navigateToContract = viewModel.urgentContract //navigate to the contract menu
                         }
                         .padding(.horizontal)
                     }
@@ -56,31 +60,33 @@ struct SellerDashboardView: View {
                     SellerFilterChipsView(filters: viewModel.filters, selectedFilter: $viewModel.selectedFilter)
 
                     // MARK: Recommended Buyers
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Recommended Buyers")
-                            .font(.title3.bold())
-                            .padding(.horizontal)
+                    if viewModel.selectedFilter != "Urgent Need" {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Recommended Buyers")
+                                .font(.title3.bold())
+                                .padding(.horizontal)
 
-                        if viewModel.isLoadingBuyers {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 20)
-                        } else if viewModel.recommendedBuyers.isEmpty {
-                            Text("No buyers available yet.")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal)
-                        } else {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 16) {
-                                    ForEach(viewModel.recommendedBuyers) { buyer in
-                                        NavigationLink(destination: LiveOfferView(buyer: buyer)) {
-                                            RecommendedBuyerCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id], showUrgentBadge: viewModel.selectedFilter == "Urgent Need")
+                            if viewModel.isLoadingBuyers {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 20)
+                            } else if viewModel.recommendedBuyers.isEmpty {
+                                Text("No buyers available yet.")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                            } else {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 16) {
+                                        ForEach(viewModel.recommendedBuyers) { buyer in
+                                            NavigationLink(destination: LiveOfferView(buyer: buyer)) {
+                                                RecommendedBuyerCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id], showUrgentBadge: false)
+                                            }
+                                            .buttonStyle(PlainButtonStyle())
                                         }
-                                        .buttonStyle(PlainButtonStyle())
                                     }
+                                    .padding(.horizontal)
                                 }
-                                .padding(.horizontal)
                             }
                         }
                     }
@@ -97,7 +103,7 @@ struct SellerDashboardView: View {
                         .padding(.horizontal)
 
                         VStack(spacing: 12) {
-                            Map(position: .constant(.region(MKCoordinateRegion(center: viewModel.searchCenter, latitudinalMeters: viewModel.searchRadius * 2500, longitudinalMeters: viewModel.searchRadius * 2500))), interactionModes: []) {
+                            Map(position: $miniMapCamera, interactionModes: []) {
 
                                 MapCircle(center: viewModel.searchCenter, radius: viewModel.searchRadius * 1000)
                                     .foregroundStyle(.orange.opacity(0.3))
@@ -119,6 +125,9 @@ struct SellerDashboardView: View {
                             }
                             .frame(height: 140)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .onChange(of: viewModel.searchCenter.latitude) { _, _ in updateMiniMap() }
+                            .onChange(of: viewModel.searchCenter.longitude) { _, _ in updateMiniMap() }
+                            .onChange(of: viewModel.searchRadius) { _, _ in updateMiniMap() }
                             .overlay(alignment: .topTrailing) {
                                 Button(action: { viewModel.isFullScreenMapPresented = true }) {
                                     Image(systemName: "arrow.up.backward.and.arrow.down.forward")
@@ -153,7 +162,7 @@ struct SellerDashboardView: View {
                  
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
-                            Text(viewModel.selectedFilter == "Urgent Need" ? "Urgent Posts" : "Buyers in Radius")
+                            Text(sectionTitle)
                                 .font(.title3.bold())
                             Spacer()
                             Text("\(viewModel.selectedFilter == "Urgent Need" ? viewModel.urgentPosts.count : viewModel.buyersInRadius.count) Found")
@@ -192,7 +201,7 @@ struct SellerDashboardView: View {
                                     Image(systemName: "tray.fill")
                                         .font(.largeTitle)
                                         .foregroundColor(.secondary)
-                                    Text("No buyers inside this radius.")
+                                    Text(viewModel.selectedFilter == "High Capacity" ? "No high capacity buyers in this radius." : "No buyers inside this radius.")
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
                                 }
@@ -213,7 +222,10 @@ struct SellerDashboardView: View {
             }
             .background(Color(UIColor.systemGroupedBackground))
             .navigationTitle("Dashboard")
-            .onAppear { viewModel.onAppear() }
+            .onAppear {
+                viewModel.onAppear()
+                updateMiniMap()
+            }
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search a town e.g. Kandy...")
             .overlay(alignment: .top) {
                 
@@ -277,6 +289,24 @@ struct SellerDashboardView: View {
 }
 
 extension SellerDashboardView {
+    var sectionTitle: String {
+        switch viewModel.selectedFilter {
+        case "Urgent Need":    return "Urgent Posts"
+        case "High Capacity":  return "High Capacity Buyers"
+        case "Nearest to Me":  return "Nearest Buyers"
+        default:               return "Buyers in Radius"
+        }
+    }
+
+    func updateMiniMap() {
+        let span = viewModel.searchRadius * 2500
+        miniMapCamera = .region(MKCoordinateRegion(
+            center: viewModel.searchCenter,
+            latitudinalMeters: span,
+            longitudinalMeters: span
+        ))
+    }
+
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(greetingText)

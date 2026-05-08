@@ -17,7 +17,7 @@ class DiscoveryDashboardViewModel {
 
     var showProfile = false
     var showNotifications = false
-    var unreadNotificationCount = 3
+    var unreadNotificationCount: Int { NotificationStore.shared.unreadCount(ownerID: currentUserID) }
     var currentUserID: String { AuthManager.shared.currentUserID }
 
    
@@ -129,10 +129,20 @@ class DiscoveryDashboardViewModel {
         }
     }
 
-    // MARK: - Monthly Spend Listener (current calendar month, buyer debit transactions)
-    private func attachMonthlySpendListener() {
+    
+    func attachMonthlySpendListener(retryCount: Int = 0) {
         let buyerID = AuthManager.shared.currentUserID
-        guard !buyerID.isEmpty else { return }
+        if buyerID.isEmpty {
+            guard retryCount < 5 else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                attachMonthlySpendListener(retryCount: retryCount + 1)
+            }
+            return
+        }
+
+        // Remove existing listener before re-attaching
+        monthlySpendListener?.remove()
 
         let calendar = Calendar.current
         let now = Date()
@@ -142,16 +152,20 @@ class DiscoveryDashboardViewModel {
             .collection("transactions")
             .whereField("buyerID", isEqualTo: buyerID)
             .whereField("isCredit", isEqualTo: false)
-            .whereField("completedAt", isGreaterThanOrEqualTo: Timestamp(date: monthStart))
             .addSnapshotListener { [weak self] snapshot, _ in
                 guard let self, let docs = snapshot?.documents else { return }
-                self.monthlySpend = docs.compactMap { $0.data()["amount"] as? Double }.reduce(0, +)
+                self.monthlySpend = docs
+                    .filter {
+                        let completedAt = ($0.data()["completedAt"] as? Timestamp)?.dateValue() ?? .distantPast
+                        return completedAt >= monthStart
+                    }
+                    .compactMap { $0.data()["amount"] as? Double }
+                    .reduce(0, +)
             }
     }
 
-    //Sellers Listener (profile edit section )
-    // Replaces one-shot fetch so profile edits (yield, cert, location) appear immediately on the buyer side.
-    private func attachSellersListener() {
+   
+    private func attachSellersListener() {  //seller recomendation 
         isLoadingSellers = true
         sellersListener = Firestore.firestore()
             .collection("users")
@@ -209,8 +223,7 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // Bids Listener
-    // Groups by sellerID (for registered seller bids) and harvestID (for harvest bids)
+    
     private func attachBidsListener() {
         bidsListener = Firestore.firestore()
             .collection("bids")
@@ -240,7 +253,7 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // MARK: - Highest Bid Helpers
+   
     func highestBid(for seller: SellerLocation) -> Double {
         highestBids[seller.id] ?? 0.0
     }
@@ -249,16 +262,36 @@ class DiscoveryDashboardViewModel {
         highestBids[harvest.id] ?? harvest.currentBid
     }
 
-    // MARK: - Harvests filtered by their own location within the search radius
+   
+
     var harvestsInRadius: [HarvestLotItem] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
-        return activeHarvests.filter { harvest in
+
+        var results = activeHarvests.filter { harvest in
             let harvestLocation = CLLocation(latitude: harvest.latitude, longitude: harvest.longitude)
             return (harvestLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
         }
+
+        switch selectedFilter {
+        case "High Volume":
+            results = results.filter { $0.quantity >= 5000 }
+        case "Ending Soon":
+            // Within the next 2 days
+            results = results.filter { $0.endDate.timeIntervalSinceNow < 172800 && $0.endDate > Date() }
+        case "Nearest to Me":
+            results.sort { h1, h2 in
+                let loc1 = CLLocation(latitude: h1.latitude, longitude: h1.longitude)
+                let loc2 = CLLocation(latitude: h2.latitude, longitude: h2.longitude)
+                return loc1.distance(from: centerLocation) < loc2.distance(from: centerLocation)
+            }
+        default:
+            break
+        }
+
+        return results
     }
 
-    // MARK: - Seller Ratings Listener — keeps sellerID → (avg, count) map live
+    //attached sellers ratings
     private func attachSellerRatingsListener() {
         sellerRatingsListener = Firestore.firestore()
             .collection("users")
@@ -301,7 +334,7 @@ class DiscoveryDashboardViewModel {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
-    // MARK: - Contracts Listener (tracks historical buyer–seller transaction counts)
+   
     private func attachContractsListener() {
         let buyerID = AuthManager.shared.currentUserID
         guard !buyerID.isEmpty else { return }
@@ -324,8 +357,7 @@ class DiscoveryDashboardViewModel {
             }
     }
 
-    // Machine learning  Recommendation Scoring
-    // Scores registered sellers AND harvest lots, caches top 5 of each.
+    
     func computeMLRecommendations() {
         let engine = RecommendationEngine.shared
         let avgMarketBid = highestBids.values.reduce(0, +) / max(1, Double(highestBids.count))
@@ -357,7 +389,7 @@ class DiscoveryDashboardViewModel {
                 .map { $0.0 }
         }
 
-        // register seller create harvest (property) include recommndation system
+        
         if !activeHarvests.isEmpty {
             let scoredHarvests: [(HarvestLotItem, Double)] = activeHarvests.map { harvest in
                 let harvestVolume   = harvest.quantity
@@ -416,7 +448,7 @@ class DiscoveryDashboardViewModel {
 
             let request = MKLocalSearch.Request()
             request.naturalLanguageQuery = query
-            // Bias results toward Sri Lanka
+           
             request.region = MKCoordinateRegion(
                 center: CLLocationCoordinate2D(latitude: 7.8731, longitude: 80.7718),
                 latitudinalMeters: 500_000,
@@ -448,7 +480,11 @@ class DiscoveryDashboardViewModel {
         case "High Volume":
             results = results.filter { RecommendationEngine.parseVolume($0.typicalYield) >= 5000 }
         case "Ending Soon":
-            results = results.filter { $0.nextHarvestDate.timeIntervalSinceNow < 604800 } // Within 7 days
+            // Harvest date within the next 2 days and not already past
+            results = results.filter {
+                let t = $0.nextHarvestDate.timeIntervalSinceNow
+                return t > 0 && t < 172800
+            }
         case "Nearest to Me":
             results.sort { s1, s2 in
                 let loc1 = CLLocation(latitude: s1.coordinate.latitude, longitude: s1.coordinate.longitude)
@@ -465,9 +501,9 @@ class DiscoveryDashboardViewModel {
     
     var recommendedSellers: [SellerLocation] {
         if !mlRecommendedSellers.isEmpty { return mlRecommendedSellers }
-        // Still loading — return empty so ProgressView shows instead of wrong order
+      
         if isLoadingSellers { return [] }
-        // Model unavailable fallback — distance sort
+       
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allSellers
             .sorted { s1, s2 in

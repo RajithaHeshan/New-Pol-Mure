@@ -1,6 +1,5 @@
 import SwiftUI
 import MapKit
-import LocalAuthentication
 
 
 private let kMinTapSize: CGFloat = 44
@@ -13,6 +12,7 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @AppStorage("isFaceIDEnabled") private var isFaceIDEnabled = false
     @State private var faceIDError: String? = nil
+    @State private var showPINSetup = false
 
     private var accentColor: Color { viewModel.isSeller ? .green : .blue }
     private var avatarBorderWidth: CGFloat { contrast == .increased ? 4 : 2.5 }
@@ -49,6 +49,12 @@ struct ProfileView: View {
             }
         }
         .onAppear { viewModel.load() }
+        .sheet(isPresented: $showPINSetup) {
+            PINSetupView(
+                onComplete: { showPINSetup = false },
+                onCancel:   { showPINSetup = false }
+            )
+        }
     }
 
     // MARK: - Loading
@@ -195,9 +201,10 @@ struct ProfileView: View {
                         get: { isFaceIDEnabled },
                         set: { newValue in
                             if newValue {
-                                enrollFaceID()
+                                showPINSetup = true
                             } else {
                                 isFaceIDEnabled = false
+                                KeychainHelper.delete(forKey: "polmure.pin")
                             }
                         }
                     ))
@@ -333,35 +340,6 @@ struct ProfileView: View {
                 .frame(maxWidth: .infinity, minHeight: kMinTapSize, alignment: .leading)
                 .contentShape(Rectangle())
                 .padding(.vertical, 4)
-            }
-        }
-    }
-
-    private func enrollFaceID() {
-        faceIDError = nil
-
-        #if targetEnvironment(simulator)
-        isFaceIDEnabled = true
-        return
-        #endif
-
-        let context = LAContext()
-        var nsError: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
-            faceIDError = "Face ID is not available on this device."
-            return
-        }
-        context.evaluatePolicy(
-            .deviceOwnerAuthenticationWithBiometrics,
-            localizedReason: "Confirm to enable Face ID unlock for Polmure"
-        ) { success, _ in
-            Task { @MainActor in
-                if success {
-                    isFaceIDEnabled = true
-                } else {
-                    isFaceIDEnabled = false
-                    faceIDError = "Face ID verification failed. Try again."
-                }
             }
         }
     }

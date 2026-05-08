@@ -3,6 +3,7 @@ import MapKit
 
 struct DiscoveryDashboardView: View {
     @State private var viewModel = DiscoveryDashboardViewModel()
+    @State private var mapCameraPosition: MapCameraPosition = .automatic
 
     var body: some View {
         NavigationStack {
@@ -22,7 +23,10 @@ struct DiscoveryDashboardView: View {
             .navigationTitle("Marketplace")
             .searchable(text: $viewModel.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search a town e.g. Kurunegala...")
             .overlay(alignment: .top) { locationSearchingOverlay }
-            .onAppear { viewModel.fetchUserProfile() }
+            .onAppear {
+                viewModel.fetchUserProfile()
+                viewModel.attachMonthlySpendListener()
+            }
             .toolbar { toolbarContent }
             .sheet(isPresented: $viewModel.showProfile) { profileSheet }
             .sheet(isPresented: $viewModel.showNotifications) { notificationsSheet }
@@ -34,11 +38,14 @@ struct DiscoveryDashboardView: View {
                     LiveBiddingView(lot: harvest.toHarvestLot())
                 }
             }
-            .navigationDestination(for: SellerLocation.self) { seller in
+            .navigationDestination(for: SellerLocation.self) { seller in  //navigate LiveBiddingView
                 LiveBiddingView(lot: seller.toHarvestLot(currentBid: viewModel.highestBid(for: seller)))
             }
         }
     }
+
+
+
 
   
     private var spendBannerSection: some View {
@@ -68,7 +75,7 @@ struct DiscoveryDashboardView: View {
         .buttonStyle(PlainButtonStyle())
     }
 
-    // MARK: - Greeting
+    //  Greeting
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(greetingText)
@@ -92,7 +99,7 @@ struct DiscoveryDashboardView: View {
         }
     }
 
-    // MARK: - Recommended
+    // Recommended
     private var recommendedSection: some View {
         VStack(alignment: .leading) {
             Text("Recommended For You")
@@ -134,7 +141,7 @@ struct DiscoveryDashboardView: View {
         }
     }
 
-    // MARK: - Map Radius
+    //  Map Radius
     private var mapRadiusSection: some View {
         VStack(spacing: 16) {
             HStack {
@@ -144,11 +151,7 @@ struct DiscoveryDashboardView: View {
             .padding(.horizontal)
 
             VStack(spacing: 12) {
-                Map(position: .constant(.region(MKCoordinateRegion(
-                    center: viewModel.searchCenter,
-                    latitudinalMeters: viewModel.searchRadius * 2500,
-                    longitudinalMeters: viewModel.searchRadius * 2500
-                ))), interactionModes: []) {
+                Map(position: $mapCameraPosition, interactionModes: []) {
                     MapCircle(center: viewModel.searchCenter, radius: viewModel.searchRadius * 1000)
                         .foregroundStyle(.blue.opacity(0.3))
                     Marker("Search Zone", coordinate: viewModel.searchCenter).tint(.blue)
@@ -163,9 +166,9 @@ struct DiscoveryDashboardView: View {
                     ForEach(viewModel.harvestsInRadius) { harvest in
                         Annotation(harvest.propertyName.isEmpty ? harvest.sellerName : harvest.propertyName,
                                    coordinate: CLLocationCoordinate2D(latitude: harvest.latitude, longitude: harvest.longitude)) {
-                            Image(systemName: "leaf.fill")
+                            Image(systemName: "basket.fill")
                                 .font(.headline).foregroundColor(.white)
-                                .padding(8).background(Color.green).clipShape(Circle())
+                                .padding(8).background(Color.orange).clipShape(Circle())
                                 .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
                         }
                     }
@@ -179,6 +182,27 @@ struct DiscoveryDashboardView: View {
                             .background(.thickMaterial).clipShape(Circle()).shadow(radius: 2)
                     }
                     .padding(8)
+                }
+                .onChange(of: viewModel.searchCenter.latitude) { _, _ in
+                    mapCameraPosition = .region(MKCoordinateRegion(
+                        center: viewModel.searchCenter,
+                        latitudinalMeters: viewModel.searchRadius * 2500,
+                        longitudinalMeters: viewModel.searchRadius * 2500
+                    ))
+                }
+                .onChange(of: viewModel.searchRadius) { _, _ in
+                    mapCameraPosition = .region(MKCoordinateRegion(
+                        center: viewModel.searchCenter,
+                        latitudinalMeters: viewModel.searchRadius * 2500,
+                        longitudinalMeters: viewModel.searchRadius * 2500
+                    ))
+                }
+                .onAppear {
+                    mapCameraPosition = .region(MKCoordinateRegion(
+                        center: viewModel.searchCenter,
+                        latitudinalMeters: viewModel.searchRadius * 2500,
+                        longitudinalMeters: viewModel.searchRadius * 2500
+                    ))
                 }
 
                 HStack {
@@ -198,10 +222,29 @@ struct DiscoveryDashboardView: View {
     // MARK: - Sellers in Radius (includes registered sellers + their harvest lots)
     private var sellersInRadiusSection: some View {
         let totalCount = viewModel.sellersInRadius.count + viewModel.harvestsInRadius.count
-        let isLoading = viewModel.isLoadingSellers || viewModel.isLoadingHarvests
+        let isLoading  = viewModel.isLoadingSellers || viewModel.isLoadingHarvests
+
+        let sectionTitle: String = {
+            switch viewModel.selectedFilter {
+            case "High Volume":   return "High Volume Sellers"
+            case "Ending Soon":   return "Ending Soon"
+            case "Nearest to Me": return "Nearest Sellers"
+            default:              return "Sellers in Radius"
+            }
+        }()
+
+        let emptyMessage: String = {
+            switch viewModel.selectedFilter {
+            case "High Volume":   return "No high-volume sellers (≥5000 nuts) in this radius."
+            case "Ending Soon":   return "No harvests ending within 2 days in this radius."
+            case "Nearest to Me": return "No sellers found in this radius."
+            default:              return "No sellers inside this radius."
+            }
+        }()
+
         return VStack(alignment: .leading) {
             HStack {
-                Text("Sellers in Radius").font(.title3.bold())
+                Text(sectionTitle).font(.title3.bold())
                 Spacer()
                 Text("\(totalCount) Found")
                     .font(.caption).foregroundColor(.secondary)
@@ -213,7 +256,8 @@ struct DiscoveryDashboardView: View {
             } else if totalCount == 0 {
                 VStack(spacing: 8) {
                     Image(systemName: "tray.fill").font(.largeTitle).foregroundColor(.secondary)
-                    Text("No sellers inside this radius.").font(.subheadline).foregroundColor(.secondary)
+                    Text(emptyMessage).font(.subheadline).foregroundColor(.secondary)
+                        .multilineTextAlignment(.center).padding(.horizontal, 32)
                 }
                 .padding(.vertical, 40).frame(maxWidth: .infinity, alignment: .center)
             } else {
@@ -253,7 +297,7 @@ struct DiscoveryDashboardView: View {
     }
 
     @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    private var toolbarContent: some ToolbarContent { //profile notifcation iocn
         ToolbarItem(placement: .topBarTrailing) {
             HStack(spacing: 16) {
                 Button(action: { viewModel.showNotifications = true }) {

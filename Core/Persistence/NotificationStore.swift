@@ -65,7 +65,7 @@ final class NotificationStore {
         load(ownerID: ownerID)
     }
 
-    // MARK: - Mark as read
+    // MARK: - Mark all read
     func markAllRead(ownerID: String) {
         let request: NSFetchRequest<CachedNotification> = CachedNotification.fetchRequest()
         request.predicate = NSPredicate(format: "ownerID == %@ AND isRead == NO", ownerID)

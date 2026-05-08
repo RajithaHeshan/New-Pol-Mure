@@ -3,38 +3,52 @@ import LocalAuthentication
 import FirebaseAuth
 
 // MARK: - Face ID Lock Screen
-// Shown every time the app launches when the user has Face ID enabled.
-// Success  → navigates to home (BuyerTabView / SellerTabView)
-// Fallback → "Use Password" button → LoginView (email + password)
+// Flow:
+//   Launch → Face ID auto-triggered
+//   Face ID success → onUnlocked()
+//   Face ID fail    → PIN entry screen
+//   PIN correct     → onUnlocked()
+//   Forgot PIN      → LoginView (re-auth) → onPasswordLogin()
+//   "Use Password"  → LoginView → onPasswordLogin()
 struct FaceIDLockView: View {
 
-    @AppStorage("userRole")        private var userRole        = ""
-    @AppStorage("isLoggedIn")      private var isLoggedIn      = false
+    var onUnlocked: (() -> Void)? = nil
+    var onPasswordLogin: (() -> Void)? = nil
+
+    @AppStorage("userRole")        private var userRole    = ""
     @AppStorage("isFaceIDEnabled") private var isFaceIDEnabled = false
 
-    @State private var unlocked      = false
-    @State private var showLogin     = false
-    @State private var errorMessage  = ""
+    @State private var screen: Screen = .faceID
+    @State private var errorMessage   = ""
     @State private var isAuthenticating = false
 
+    enum Screen { case faceID, pin, login }
+
     var body: some View {
-        Group {
-            if unlocked {
-                homeView
-            } else if showLogin {
-                LoginView()
-            } else {
-                lockScreen
-            }
-        }
-        .onAppear {
-            #if !targetEnvironment(simulator)
-            authenticate()
-            #endif
+        switch screen {
+        case .faceID:
+            lockScreen
+                .onAppear { authenticate() }
+
+        case .pin:
+            PINEntryView(
+                onUnlocked: {
+                    refreshSession()
+                    onUnlocked?()
+                },
+                onForgotPIN: {
+                    screen = .login
+                }
+            )
+
+        case .login:
+            LoginView(onLoginSuccess: {
+                onPasswordLogin?()
+            })
         }
     }
 
-    // MARK: - Lock screen UI
+    // MARK: - Face ID lock UI
     private var lockScreen: some View {
         ZStack {
             LinearGradient(
@@ -47,27 +61,22 @@ struct FaceIDLockView: View {
             VStack(spacing: 32) {
                 Spacer()
 
-                // App icon area
                 VStack(spacing: 12) {
                     Image(systemName: "leaf.circle.fill")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 72, height: 72)
                         .foregroundColor(.polmureEmerald)
-
                     Text("Polmure")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
                 }
 
-                // Face ID icon
                 VStack(spacing: 16) {
                     Image(systemName: "faceid")
                         .font(.system(size: 60))
                         .foregroundColor(.polmureEmerald)
-
                     Text("Sign in with Face ID")
                         .font(.title3.bold())
-
                     Text("Use Face ID to access your account")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
@@ -75,7 +84,6 @@ struct FaceIDLockView: View {
                         .padding(.horizontal, 40)
                 }
 
-                // Error message
                 if !errorMessage.isEmpty {
                     Text(errorMessage)
                         .font(.caption)
@@ -86,9 +94,7 @@ struct FaceIDLockView: View {
 
                 Spacer()
 
-                // Action buttons
                 VStack(spacing: 12) {
-                    // Retry Face ID
                     Button {
                         authenticate()
                     } label: {
@@ -109,41 +115,39 @@ struct FaceIDLockView: View {
                     }
                     .disabled(isAuthenticating)
                     .padding(.horizontal, 24)
-                    .accessibilityLabel("Unlock with Face ID")
 
-                    // Use password fallback — HIG: always provide a non-biometric path
                     Button {
-                        showLogin = true
+                        screen = .pin
                     } label: {
-                        Text("Use Password Instead")
+                        Text("Use Passcode")
                             .font(.subheadline.bold())
                             .foregroundColor(.polmureEmerald)
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .padding(.horizontal, 24)
-                    .accessibilityLabel("Use Password Instead")
-                    .accessibilityHint("Opens the email and password login screen")
+
+                    Button {
+                        screen = .login
+                    } label: {
+                        Text("Use Password Instead")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .padding(.horizontal, 24)
                 }
                 .padding(.bottom, 40)
             }
         }
     }
 
-    // MARK: - Face ID authentication
+    // MARK: - Face ID
     private func authenticate() {
-        #if targetEnvironment(simulator)
-        if let firebaseUser = Auth.auth().currentUser {
-            AuthManager.shared.refreshSession(userId: firebaseUser.uid, role: userRole)
-        }
-        unlocked = true
-        return
-        #endif
-
         let context = LAContext()
         var nsError: NSError?
 
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
-            errorMessage = "Face ID is not available. Use your password."
+            errorMessage = "Face ID not available. Use your passcode or password."
             return
         }
 
@@ -157,31 +161,26 @@ struct FaceIDLockView: View {
             Task { @MainActor in
                 isAuthenticating = false
                 if success {
-                    if let firebaseUser = Auth.auth().currentUser {
-                        AuthManager.shared.refreshSession(
-                            userId: firebaseUser.uid,
-                            role: userRole
-                        )
-                    }
-                    unlocked = true
-                } else {
-                    if let err = error as? LAError, err.code == .userFallback {
-                        showLogin = true
-                    } else {
-                        errorMessage = "Face ID failed. Try again or use your password."
+                    refreshSession()
+                    onUnlocked?()
+                } else if let err = error as? LAError {
+                    switch err.code {
+                    case .userCancel, .appCancel, .systemCancel:
+                        break
+                    case .biometryLockout, .authenticationFailed:
+                        // Face ID locked out or failed — go straight to PIN
+                        screen = .pin
+                    default:
+                        errorMessage = "Face ID failed. Use your passcode or password."
                     }
                 }
             }
         }
     }
 
-    // MARK: - Home view (role-based)
-    @ViewBuilder
-    private var homeView: some View {
-        if userRole == "BUYER" || userRole == "Buyer" {
-            BuyerTabView()
-        } else {
-            SellerTabView()
+    private func refreshSession() {
+        if let firebaseUser = Auth.auth().currentUser {
+            AuthManager.shared.refreshSession(userId: firebaseUser.uid, role: userRole)
         }
     }
 }

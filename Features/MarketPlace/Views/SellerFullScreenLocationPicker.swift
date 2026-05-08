@@ -124,7 +124,7 @@ struct SellerFullScreenLocationPicker: View {
                     }
                     HStack {
                         Text("\(Int(searchRadius)) km").font(.headline).foregroundColor(.orange)
-                        Slider(value: $searchRadius, in: 1...50, step: 1).tint(.orange)
+                        Slider(value: $searchRadius, in: 1...200, step: 5).tint(.orange)
                     }
                     Button(action: { dismiss() }) {
                         Text("Apply Search Area").font(.headline).frame(maxWidth: .infinity).padding().background(Color.orange).foregroundColor(.white).cornerRadius(12)

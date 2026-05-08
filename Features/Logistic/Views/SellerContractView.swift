@@ -138,7 +138,31 @@ struct SellerContractView: View {
     private var stickyBottomAction: some View {
         VStack {
             Spacer()
-            if !viewModel.isDisputed && viewModel.currentState == .buyerEnRoute {
+            if viewModel.isDisputed {
+                // Dispute blocks all handover actions
+                Text("Please resolve the dispute above to continue.")
+                    .font(.caption.bold())
+                    .foregroundColor(.red)
+                    .padding(.bottom, 30)
+
+            } else if viewModel.currentState == .buyerEnRoute {
+                // Buyer is en route but hasn't approved quality yet — handover locked
+                HStack(spacing: 10) {
+                    Image(systemName: "lock.fill")
+                        .foregroundColor(.secondary)
+                    Text("Waiting for buyer to approve quality…")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(12)
+                .padding(.horizontal)
+                .padding(.bottom, 20)
+
+            } else if viewModel.currentState == .qualityApproved {
+                // Buyer approved quality — seller can now confirm handover
                 Button(action: {
                     withAnimation { viewModel.confirmHandover() }
                 }) {
@@ -161,6 +185,7 @@ struct SellerContractView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 20)
                 .background(LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground).opacity(0.0), Color(UIColor.systemGroupedBackground)]), startPoint: .top, endPoint: .bottom).padding(.top, -20))
+
             } else if viewModel.currentState == .completed {
                 Button(action: { viewModel.showRatingSheet = true }) {
                     Label("Rate \(viewModel.buyerName)", systemImage: "star.fill")
@@ -174,11 +199,6 @@ struct SellerContractView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 20)
                 .background(LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground).opacity(0.0), Color(UIColor.systemGroupedBackground)]), startPoint: .top, endPoint: .bottom).padding(.top, -20))
-            } else if viewModel.isDisputed {
-                Text("Please resolve the dispute above to continue.")
-                    .font(.caption.bold())
-                    .foregroundColor(.red)
-                    .padding(.bottom, 30)
             }
         }
     }

@@ -66,7 +66,7 @@ class SellerContractViewModel {
         case "fundsLocked":     self.currentState = .escrowSecured
         case "inspection":      self.currentState = .buyerEnRoute
         case "dispute":         self.currentState = .buyerEnRoute
-        case "qualityApproved": self.currentState = .buyerEnRoute
+        case "qualityApproved": self.currentState = .qualityApproved  // buyer approved — seller can confirm handover
         case "payment":         self.currentState = .qualityApproved
         case "completed":       self.currentState = .completed
         default:                self.currentState = .escrowSecured
@@ -90,6 +90,7 @@ class SellerContractViewModel {
 
     // MARK: - Fetch Seller's Own Estate Profile for Calendar event location
     private func fetchSellerCoordinate(sellerID: String) {
+        guard !sellerID.isEmpty else { return }
         Task {
             let doc = try? await Firestore.firestore()
                 .collection("users")
@@ -108,6 +109,7 @@ class SellerContractViewModel {
 
     // MARK: - Fetch Buyer's Typical Volume
     private func fetchBuyerVolume(buyerID: String) {
+        guard !buyerID.isEmpty else { return }
         Task {
             let doc = try? await Firestore.firestore()
                 .collection("users")
@@ -140,7 +142,7 @@ class SellerContractViewModel {
                     case "fundsLocked":     self.currentState = .escrowSecured
                     case "inspection":      self.currentState = .buyerEnRoute
                     case "dispute":         self.currentState = .buyerEnRoute
-                    case "qualityApproved": self.currentState = .buyerEnRoute
+                    case "qualityApproved": self.currentState = .qualityApproved  // buyer approved — unlock handover
                     case "payment":         self.currentState = .qualityApproved
                     case "completed":       self.currentState = .completed
                     default: break

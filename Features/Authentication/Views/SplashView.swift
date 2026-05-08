@@ -22,7 +22,10 @@ struct SplashView: View {
             case .login:
                 LoginView()
             case .faceID:
-                FaceIDLockView()
+                FaceIDLockView(
+                    onUnlocked: { destination = .home },
+                    onPasswordLogin: { destination = .home }
+                )
             case .home:
                 homeView
             }
@@ -33,7 +36,10 @@ struct SplashView: View {
             }
         }
         .onChange(of: isLoggedIn) { _, newValue in
-            resolve()
+            // Only re-route on logout (newValue == false) or explicit login from non-FaceID screen
+            if destination != .faceID {
+                resolve()
+            }
         }
     }
 

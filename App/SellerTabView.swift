@@ -18,7 +18,6 @@ struct SellerTabView: View {
 
             SellerActivityDashboardView()
                 .tabItem { Label("Activity", systemImage: selectedTab == 1 ? "doc.text.fill" : "doc.text") }
-                .badge(1)
                 .tag(1)
 
             HarvestCreatorView()

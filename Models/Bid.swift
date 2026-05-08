@@ -5,16 +5,16 @@ import FirebaseFirestore
 
 struct Bid: Identifiable {
     let id: String
-    let harvestID: String   // Harvest document ID — used by LiveBiddingViewModel listener
-    let sellerID: String    // Seller's user ID — used by SellerActivityDashboard
-    let sellerName: String  // Seller's display name — shown in buyer's Activity tab
+    let harvestID: String   
+    let sellerID: String    
+    let sellerName: String 
     let bidderID: String
     let bidderName: String
     let amount: Double
     let placedAt: Date
     let status: String      // "pending" | "accepted" | "declined"
 
-    init?(id: String, data: [String: Any]) {  //requiremnt missing 
+    init?(id: String, data: [String: Any]) {  //requiremnt missing data incompleted skiped 
         guard
             let bidderID   = data["bidderID"]   as? String,
             let bidderName = data["bidderName"] as? String,

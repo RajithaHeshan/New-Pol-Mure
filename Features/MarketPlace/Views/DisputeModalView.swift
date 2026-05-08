@@ -68,7 +68,7 @@ struct DisputeModalView: View {
                 Section {
                     Button(action: {
                         isInputFocused = false
-                        print("🔵 Submit button tapped — counterOfferAmount: '\(counterOfferAmount)'")
+                        //print("🔵 Submit button tapped — counterOfferAmount: '\(counterOfferAmount)'")
                         let amount = counterOfferAmount.trimmingCharacters(in: .whitespaces)
                         guard !amount.isEmpty, let value = Double(amount), value > 0 else {
                             print("🔵 View guard failed — amount: '\(amount)'")

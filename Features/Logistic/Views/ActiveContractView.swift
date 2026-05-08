@@ -505,11 +505,19 @@ struct ContextualActionArea: View {
             } else if viewModel.currentState == .paymentPending {
                 HStack(spacing: 12) {
                     ProgressView()
-                    Text("Releasing escrow funds to seller…")
-                        .font(.subheadline.bold())
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Quality Approved")
+                            .font(.subheadline.bold())
+                            .foregroundColor(.green)
+                        Text("Waiting for seller to confirm handover…")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.green.opacity(0.06))
+                .cornerRadius(12)
 
           
             } else if viewModel.currentState == .completed {

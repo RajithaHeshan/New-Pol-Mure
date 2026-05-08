@@ -50,7 +50,7 @@ struct NotificationsView: View {
         }
     }
 
-    // MARK: - List
+   
     private var notificationList: some View {
         List {
             ForEach(store.notifications) { notification in
@@ -72,7 +72,7 @@ struct NotificationsView: View {
         .scrollContentBackground(.hidden)
     }
 
-    // MARK: - Empty state
+   
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "bell.slash.fill")
@@ -150,7 +150,7 @@ struct NotificationRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // Unread dot
+            
             if !notification.isRead {
                 Circle()
                     .fill(accentColor)

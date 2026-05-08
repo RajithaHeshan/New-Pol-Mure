@@ -36,18 +36,17 @@ class ActivityDashboardViewModel {
     var isLoadingTransactions = false
     var isLoadingContracts    = false
 
-    private let currentBuyerID: String
+    private var currentBuyerID: String { AuthManager.shared.currentUserID }
 
     private let bidsListenerBox         = ActivityListenerBox()
     private let offersListenerBox       = ActivityListenerBox()
     private let transactionsListenerBox = ActivityListenerBox()
     private let contractsListenerBox    = ActivityListenerBox()
 
-  
+
     private let allBidsListenerBox = ActivityListenerBox()
 
     init() {
-        self.currentBuyerID = AuthManager.shared.currentUserID
         loadCachedData()
         attachBidsListener()
         attachAllBidsListener()
@@ -68,7 +67,7 @@ class ActivityDashboardViewModel {
         if !cachedTx.isEmpty { transactions = cachedTx }
         let cachedContracts = cache.loadContracts(ownerID: currentBuyerID)
         if !cachedContracts.isEmpty { contracts = cachedContracts }
-     // TEMPORARY — remove after testing
+   
     print("📦 CoreData loaded: bids=\(cachedBids.count) offers=\(cachedOffers.count) tx=\(cachedTx.count) contracts=\(cachedContracts.count)")
     }
 
@@ -212,15 +211,15 @@ class ActivityDashboardViewModel {
 
         Task {
             do {
-               
+
                 try await db.collection("offers").document(offer.id)
                     .updateData(["status": "accepted"])
 
-               
+
                 let buyerDoc   = try? await db.collection("users").document(currentBuyerID).getDocument()
                 let buyerName  = buyerDoc?.data()?["fullName"] as? String ?? ""
 
-               
+
                 let sellerDoc = try? await db.collection("users").document(offer.sellerID).getDocument()
 
                 let contractRef = "#\(Int.random(in: 1000...9999))"
@@ -247,7 +246,7 @@ class ActivityDashboardViewModel {
         }
     }
 
- 
+
     func declineOffer(_ offer: Offer) {
         Task {
             do {
@@ -261,7 +260,7 @@ class ActivityDashboardViewModel {
         }
     }
 
-    // MARK: - Delete Bid (only pending/outbid — cannot delete accepted bids)
+  
     func deleteBid(_ bid: Bid) {
         guard bid.status == "pending" else { return }
         Task {
@@ -273,13 +272,13 @@ class ActivityDashboardViewModel {
         }
     }
 
-    // MARK: - Delete Transaction (local hide only — kept in Firestore for audit)
+   
     func deleteTransaction(at offsets: IndexSet) {
         transactions.remove(atOffsets: offsets)
         CoreDataCache.shared.saveTransactions(transactions, ownerID: currentBuyerID)
     }
 
-    // MARK: - Delete Contract (only completed or rejected)
+   
     func deleteContract(_ contract: Contract) {
         guard contract.status == "completed" || contract.status == "rejected" else { return }
         Task {

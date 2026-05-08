@@ -114,6 +114,11 @@ class ActiveContractViewModel {
                         self.isDisputePending   = status == "dispute"
                         self.isLocationRevealed = status == "inspection" || status == "dispute" || status == "qualityApproved" || status == "payment" || status == "completed"
                     }
+                    // Show rating sheet when seller confirms handover and contract completes
+                    if status == "completed" {
+                        self.showRatingSheet = true
+                        self.checkIfAlreadyRated()  // will set false if already rated
+                    }
                 }
 
                
@@ -230,8 +235,8 @@ class ActiveContractViewModel {
 
     
 
-    //  Approve Quality escrow simulation 
-
+    // Buyer approves quality — writes transactions and advances to qualityApproved.
+    // Seller must then confirm handover to reach "completed".
     func releaseFundsSimulation() {
         isReleasingFunds = true
         withAnimation { currentState = .paymentPending }
@@ -282,8 +287,7 @@ class ActiveContractViewModel {
                 .updateData(["status": "qualityApproved"])
 
             isReleasingFunds = false
-          
-            showRatingSheet = true
+            // Rating sheet fires when the contract listener receives "completed" (after seller confirms handover)
         }
     }
 

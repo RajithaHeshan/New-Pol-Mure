@@ -18,7 +18,6 @@ struct BuyerTabView: View {
 
             ActivityDashboardView()
                 .tabItem { Label("Activity", systemImage: selectedTab == 1 ? "doc.text.fill" : "doc.text") }
-                .badge(2)
                 .tag(1)
 
             UrgentBoardView()

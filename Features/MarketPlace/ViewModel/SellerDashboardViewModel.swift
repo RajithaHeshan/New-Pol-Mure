@@ -41,16 +41,16 @@ class SellerDashboardViewModel {
     var allBuyers: [RegisteredBuyer] = []
     var isLoadingBuyers = false
 
-    // Live highest offer per buyerID — drives the price badge on every buyer card
+   
     var highestOfferPerBuyer: [String: Double] = [:]
     private let offersListenerBox = DashboardListenerBox()
     private let buyersListenerBox = DashboardListenerBox()
     private let urgentRequestsListenerBox = DashboardListenerBox()
 
-    // Live urgent posts from urgentRequests collection
+   
     var urgentPosts: [UrgentRequest] = []
 
-    // MARK: - Live Dashboard Metrics (replaces hardcoded values)
+   
     var escrowTotal: Double = 0
     var activeOffersTotal: Double = 0
     var urgentContractMessage: String? = nil
@@ -58,24 +58,24 @@ class SellerDashboardViewModel {
     private let contractListenerBox  = DashboardListenerBox()
     private let disputeListenerBox   = DashboardListenerBox()
 
-    // Internal cache — merged from two separate Firestore listeners
+   
     private var disputeContract:  Contract? = nil
     private var approvedContract: Contract? = nil
 
-    // Fetched dispute details for the banner
+   
     var disputeReason: String? = nil
     var disputeNotes: String? = nil
     var disputeCounterOffer: Double? = nil
 
-    // MARK: - Seller Profile (used by ML engine)
+   
     private var sellerVolume: Int = 5000
     private var sellerHasExport: Bool = false
 
-    // MARK: - Historical Transactions Per Buyer (buyerID → count of completed contracts)
+   
     private var historicalTransactions: [String: Int] = [:]
     private let historyListenerBox = DashboardListenerBox()
 
-    // MARK: - ML-Scored Recommendations Cache
+    
     var mlRecommendedBuyers: [RegisteredBuyer] = []
 
     init() {
@@ -87,7 +87,7 @@ class SellerDashboardViewModel {
         attachContractsHistoryListener()
     }
 
-    // Called from .onAppear so listeners are (re)attached after auth is fully restored
+    
     func onAppear() {
         fetchUserProfile()
         attachMetricsListener()
@@ -95,7 +95,7 @@ class SellerDashboardViewModel {
     }
 
 
-    // MARK: - Real-Time Highest Offer per Buyer
+   
     private func attachOffersListener() {
         offersListenerBox.listener = Firestore.firestore()
             .collection("offers")
@@ -133,7 +133,7 @@ class SellerDashboardViewModel {
             }
     }
 
-    // MARK: - Live Urgent Posts listener
+   
     private func attachUrgentRequestsListener() {
         urgentRequestsListenerBox.listener = Firestore.firestore()
             .collection("urgentRequests")
@@ -150,13 +150,13 @@ class SellerDashboardViewModel {
             }
     }
 
-    // MARK: - Escrow Total (reuses contractListenerBox — computed from same snapshot)
+    
     private func attachMetricsListener() {
-        // escrowTotal is now derived inside attachUrgentListeners from the same snapshot.
-        // Nothing to do here — kept for compatibility with onAppear call.
+        
     }
 
-    // MARK: - Urgent listener: single query on sellerID, filter status in Swift (no composite index needed)
+   //related uirgent post according to seller id 
+   
     private func attachUrgentListeners() {
         let sellerID = AuthManager.shared.currentUserID
         guard !sellerID.isEmpty else {
@@ -165,12 +165,11 @@ class SellerDashboardViewModel {
         }
         print("✅ attachUrgentListeners: sellerID = \(sellerID)")
 
-        // Remove any existing listeners before re-attaching to avoid duplicates
+       
         contractListenerBox.listener?.remove()
         disputeListenerBox.listener?.remove()
 
-        // Single-field query — no composite index required.
-        // We filter by status in Swift so Firestore never needs a multi-field index.
+        
         contractListenerBox.listener = Firestore.firestore()
             .collection("contracts")
             .whereField("sellerID", isEqualTo: sellerID)
@@ -192,8 +191,9 @@ class SellerDashboardViewModel {
             }
     }
 
-    // Picks the highest-priority contract to show in the banner.
-    // Dispute takes priority over quality-approved.
+
+//urgent banner  
+
     private func updateUrgentBanner() {
         if let contract = disputeContract {
             urgentContract = contract
@@ -264,7 +264,9 @@ class SellerDashboardViewModel {
         }
     }
 
-    // MARK: - Firebase Fetch Logic
+
+
+   
     func fetchUserProfile(retryCount: Int = 0) {
         let userId = AuthManager.shared.currentUserID
 
@@ -311,7 +313,7 @@ class SellerDashboardViewModel {
         }
     }
 
-    // MARK: - Live Buyers Listener (real-time so isUrgent changes appear immediately)
+   
     private func attachBuyersListener() {
         isLoadingBuyers = true
         buyersListenerBox.listener = Firestore.firestore()
@@ -368,7 +370,7 @@ class SellerDashboardViewModel {
     }
 
 
-    // MARK: - Contracts History Listener (tracks per-buyer historical transactions for this seller)
+    
     private func attachContractsHistoryListener() {
         let sellerID = AuthManager.shared.currentUserID
         guard !sellerID.isEmpty else { return }
@@ -391,8 +393,7 @@ class SellerDashboardViewModel {
             }
     }
 
-    // MARK: - ML Recommendation Scoring
-    // Scores every registered buyer using the CoreML model and caches top 5.
+    
     func computeMLRecommendations() {
         guard !allBuyers.isEmpty else { return }
 
@@ -469,7 +470,7 @@ class SellerDashboardViewModel {
         }
     }
 
-    // MARK: - Buyers Within Search Radius (All / High Capacity / Nearest to Me)
+    
     var buyersInRadius: [RegisteredBuyer] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
 
@@ -480,7 +481,10 @@ class SellerDashboardViewModel {
 
         switch selectedFilter {
         case "High Capacity":
-            results = results.filter { RecommendationEngine.parseVolume($0.typicalVolume) >= 10000 }
+            results = results.filter { RecommendationEngine.parseVolume($0.typicalVolume) >= 5000 }
+        case "Urgent Need":
+            let urgentBuyerIDs = Set(urgentPosts.map { $0.buyerID })
+            results = results.filter { urgentBuyerIDs.contains($0.id) }
         case "Nearest to Me":
             results.sort { b1, b2 in
                 let loc1 = CLLocation(latitude: b1.coordinate.latitude, longitude: b1.coordinate.longitude)
@@ -494,7 +498,7 @@ class SellerDashboardViewModel {
         return results
     }
 
-    // Build a RegisteredBuyer from an UrgentRequest — uses allBuyers for coordinate if available
+   
     func buyer(for post: UrgentRequest) -> RegisteredBuyer {
         if let match = allBuyers.first(where: { $0.id == post.buyerID }) {
             return match
@@ -513,12 +517,13 @@ class SellerDashboardViewModel {
         )
     }
 
-    // ML-powered: returns top-5 buyers scored by the CoreML model.
-    // Returns empty while loading so UI shows ProgressView, not a flickering distance-sort list.
+   
+    //top five buyers according to Ml
+    
     var recommendedBuyers: [RegisteredBuyer] {
         if !mlRecommendedBuyers.isEmpty { return mlRecommendedBuyers }
         if isLoadingBuyers { return [] }
-        // Model unavailable fallback — distance sort
+        
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
         return allBuyers
             .sorted { b1, b2 in

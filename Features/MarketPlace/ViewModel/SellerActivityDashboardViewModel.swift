@@ -38,7 +38,7 @@ class SellerActivityDashboardViewModel {
     var isLoadingTransactions = false
     var isLoadingContracts    = false
 
-    private let currentSellerID: String
+    private var currentSellerID: String { AuthManager.shared.currentUserID }
 
     private let offersListenerBox       = SellerActivityListenerBox()
     private let allOffersListenerBox   = SellerActivityListenerBox()
@@ -47,7 +47,6 @@ class SellerActivityDashboardViewModel {
     private let contractsListenerBox   = SellerActivityListenerBox()
 
     init() {
-        self.currentSellerID = AuthManager.shared.currentUserID
         loadCachedData()
         startListeners()
     }
@@ -155,6 +154,7 @@ class SellerActivityDashboardViewModel {
         bidsListenerBox.listener = Firestore.firestore()
             .collection("bids")
             .whereField("sellerID", isEqualTo: currentSellerID)
+            .whereField("status", in: ["pending", "accepted"])
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -184,71 +184,78 @@ class SellerActivityDashboardViewModel {
 
    
 
-   //accept bids and generate contract 
-
+    // MARK: - Accept bid and create contract
     func acceptBid(_ bid: Bid) {
         let db = Firestore.firestore()
+        let sellerID = currentSellerID
+
+        guard !sellerID.isEmpty, !bid.id.isEmpty else { return }
 
         Task {
+            // 1. Mark this bid accepted
             do {
                 try await db.collection("bids").document(bid.id)
                     .updateData(["status": "accepted"])
-
-                let sellerDoc = try? await db.collection("users").document(currentSellerID).getDocument()
-                let sellerName = sellerDoc?.data()?["fullName"] as? String ?? ""
-
-                let contractRef = "#\(Int.random(in: 1000...9999))"
-                var contractData: [String: Any] = [
-                    "contractRef": contractRef,
-                    "buyerID":     bid.bidderID,
-                    "buyerName":   bid.bidderName,
-                    "sellerID":    currentSellerID,
-                    "sellerName":  sellerName,
-                    "status":      "escrow",
-                    "amount":      bid.amount,
-                    "source":      "bid",
-                    "createdAt":   Timestamp()
-                ]
-
-                
-                //for harvest
-
-
-                if !bid.harvestID.isEmpty {
-                    let harvestDoc = try? await db.collection("harvestLots").document(bid.harvestID).getDocument()
-                    if let data = harvestDoc?.data() {
-                        if let lat = data["latitude"] as? Double, let lng = data["longitude"] as? Double {
-                            contractData["harvestLatitude"]  = lat
-                            contractData["harvestLongitude"] = lng
-                        }
-                        if let qty = data["quantity"] as? Int    { contractData["quantity"]     = qty }
-                        if let loc = data["locationName"] as? String { contractData["locationName"] = loc }
-                    }
-                } else {
-                    if let yield = sellerDoc?.data()?["typicalYield"] as? String,
-                       let qty = Int(yield) { contractData["quantity"] = qty }
-                    if let loc = sellerDoc?.data()?["locationName"] as? String { contractData["locationName"] = loc }
-                }
-
-                try await db.collection("contracts").addDocument(data: contractData)
-
             } catch {
-                print("Accept bid error: \(error.localizedDescription)")
+                print("acceptBid failed: \(error.localizedDescription)")
+                return
+            }
+
+            // 2. Fetch seller profile for contract
+            let sellerDoc = try? await db.collection("users").document(sellerID).getDocument()
+            let sellerName = sellerDoc?.data()?["fullName"] as? String ?? ""
+
+            // 3. Build contract data
+            let contractRef = "#\(Int.random(in: 1000...9999))"
+            var contractData: [String: Any] = [
+                "contractRef": contractRef,
+                "buyerID":     bid.bidderID,
+                "buyerName":   bid.bidderName,
+                "sellerID":    sellerID,
+                "sellerName":  sellerName,
+                "status":      "escrow",
+                "amount":      bid.amount,
+                "source":      "bid",
+                "createdAt":   Timestamp()
+            ]
+
+            if !bid.harvestID.isEmpty {
+                let harvestDoc = try? await db.collection("harvestLots").document(bid.harvestID).getDocument()
+                if let data = harvestDoc?.data() {
+                    if let lat = data["latitude"]  as? Double,
+                       let lng = data["longitude"] as? Double {
+                        contractData["harvestLatitude"]  = lat
+                        contractData["harvestLongitude"] = lng
+                    }
+                    if let qty = data["quantity"]     as? Int    { contractData["quantity"]     = qty }
+                    if let loc = data["locationName"] as? String { contractData["locationName"] = loc }
+                }
+            } else {
+                if let yieldStr = sellerDoc?.data()?["typicalYield"] as? String {
+                    let digits = yieldStr.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                    if let qty = Int(digits) { contractData["quantity"] = qty }
+                }
+                if let loc = sellerDoc?.data()?["locationName"] as? String {
+                    contractData["locationName"] = loc
+                }
+            }
+
+            // 4. Create contract
+            do {
+                try await db.collection("contracts").addDocument(data: contractData)
+            } catch {
+                print("acceptBid contract creation failed: \(error.localizedDescription)")
             }
         }
     }
 
-  
     func declineBid(_ bid: Bid) {
+        guard !bid.id.isEmpty else { return }
         Task {
-            do {
-                try await Firestore.firestore()
-                    .collection("bids")
-                    .document(bid.id)
-                    .updateData(["status": "declined"])
-            } catch {
-                print("Decline bid error: \(error.localizedDescription)")
-            }
+            try? await Firestore.firestore()
+                .collection("bids")
+                .document(bid.id)
+                .updateData(["status": "declined"])
         }
     }
 

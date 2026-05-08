@@ -8,17 +8,25 @@ class AuthViewModel {
     var email = ""
     var password = ""
     var errorMessage = ""
+    var isLoading = false
 
     // MARK: - Email/Password Login
-    func signInWithEmail(completion: @escaping (Bool, String, String) -> Void) {
+    func signInWithEmail() async -> (success: Bool, role: String) {
         let safeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        Task {
-            do {
-                let role = try await AuthManager.shared.loginUser(email: safeEmail, password: password)
-                DispatchQueue.main.async { completion(true, role, "") }
-            } catch {
-                DispatchQueue.main.async { completion(false, "", error.localizedDescription) }
-            }
+        guard !safeEmail.isEmpty, !password.isEmpty else {
+            errorMessage = "Please enter your email and password."
+            return (false, "")
+        }
+        isLoading = true
+        errorMessage = ""
+        do {
+            let role = try await AuthManager.shared.loginUser(email: safeEmail, password: password)
+            isLoading = false
+            return (true, role)
+        } catch {
+            isLoading = false
+            errorMessage = error.localizedDescription
+            return (false, "")
         }
     }
 
@@ -32,9 +40,9 @@ class AuthViewModel {
         Task {
             do {
                 try await Auth.auth().sendPasswordReset(withEmail: safeEmail)
-                DispatchQueue.main.async { completion(true, "") }
+                completion(true, "")
             } catch {
-                DispatchQueue.main.async { completion(false, error.localizedDescription) }
+                completion(false, error.localizedDescription)
             }
         }
     }

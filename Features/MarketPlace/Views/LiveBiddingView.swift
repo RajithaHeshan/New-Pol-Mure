@@ -60,7 +60,7 @@ struct LiveBiddingView: View {
 }
 
 
-struct BiddingMapHeader: View {
+struct BiddingMapHeader: View {    //location view
     let coordinate: CLLocationCoordinate2D
 
     // True when Firestore had no lat/lng — we skip the map entirely
@@ -239,7 +239,7 @@ struct BiddingTerminal: View {
                 }
             }
 
-            // MARK: - Place Bid Button
+            // Placed Bid Button
             Button(action: {
                 viewModel.placeBid()
                 isInputFocused = false
@@ -281,12 +281,7 @@ struct PresentationDebugTools: View {
     }
 }
 
-//struct MarketAnalyticsView: View {
-//    var body: some View {
-//        Text("Market Analytics Placeholder")
-//            .navigationTitle("Market Prices")
-//    }
-//}
+
 
 #Preview {
     NavigationStack {

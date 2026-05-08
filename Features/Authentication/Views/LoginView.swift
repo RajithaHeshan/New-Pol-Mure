@@ -2,6 +2,8 @@ import SwiftUI
 import AuthenticationServices
 
 struct LoginView: View {
+    var onLoginSuccess: (() -> Void)? = nil
+
     @State private var viewModel = AuthViewModel()
 
     @AppStorage("isLoggedIn") private var isLoggedIn: Bool = false
@@ -57,18 +59,32 @@ struct LoginView: View {
                         .padding(.horizontal, 24)
 
                         VStack(spacing: 16) {
-                            PrimaryButton(title: "Sign In") {
+                            Button(action: {
                                 focusedField = nil
-                                viewModel.signInWithEmail { success, role, errorMsg in
-                                    if success {
-                                        userRole   = role
+                                Task {
+                                    let result = await viewModel.signInWithEmail()
+                                    if result.success {
+                                        userRole   = result.role
                                         isLoggedIn = true
-                                        // SplashView observes isLoggedIn and re-routes to home
-                                    } else {
-                                        viewModel.errorMessage = errorMsg
+                                        onLoginSuccess?()
                                     }
                                 }
+                            }) {
+                                Group {
+                                    if viewModel.isLoading {
+                                        ProgressView().tint(.white)
+                                    } else {
+                                        Text("Sign In").font(.headline)
+                                    }
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 54)
+                                .background(Color.polmureEmerald)
+                                .cornerRadius(14)
+                                .shadow(color: Color.polmureEmerald.opacity(0.3), radius: 8, x: 0, y: 4)
                             }
+                            .disabled(viewModel.isLoading)
 
                             if !viewModel.errorMessage.isEmpty {
                                 Text(viewModel.errorMessage)
