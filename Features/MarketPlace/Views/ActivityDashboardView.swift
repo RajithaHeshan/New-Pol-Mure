@@ -341,6 +341,9 @@ struct TransactionDetailCard: View {
             // Detail rows
             VStack(spacing: 10) {
                 txRow(icon: "person.fill", label: "Seller", value: tx.sellerName)
+                if !tx.harvestName.isEmpty {
+                    txRow(icon: "basket.fill", label: "Harvest", value: tx.harvestName)
+                }
                 txRow(icon: "leaf.fill", label: "Quantity", value: "\(tx.quantity) Coconuts")
                 txRow(icon: "scalemass.fill", label: "Price / Nut", value: "Rs \(String(format: "%.2f", tx.pricePerNut))")
                 txRow(icon: "percent", label: "Platform Fee (2%)", value: "Rs \(String(format: "%.2f", tx.transactionFee))")

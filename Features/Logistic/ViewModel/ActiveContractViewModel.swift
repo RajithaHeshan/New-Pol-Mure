@@ -36,6 +36,7 @@ class ActiveContractViewModel {
     var sellerLocationName: String = ""
     var sellerYield:        String = ""
     let amount:      Double
+    let harvestName: String
 
     
     var buyerCoordinate:  CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612)
@@ -70,6 +71,7 @@ class ActiveContractViewModel {
         self.contractLocationName = contract.locationName
         self.contractSource       = contract.source
         self.amount               = contract.amount
+        self.harvestName          = contract.harvestName
 
         self.currentState       = Self.mapStatus(contract.status)
         self.isDisputePending   = contract.status == "dispute"
@@ -260,6 +262,7 @@ class ActiveContractViewModel {
                 "amount":         amount,
                 "transactionFee": fee,
                 "locationName":   loc,
+                "harvestName":    harvestName,
                 "source":         contractSource,
                 "isCredit":       false,
                 "completedAt":    now
@@ -276,6 +279,7 @@ class ActiveContractViewModel {
                 "amount":         amount,
                 "transactionFee": fee,
                 "locationName":   loc,
+                "harvestName":    harvestName,
                 "source":         contractSource,
                 "isCredit":       true,
                 "completedAt":    now

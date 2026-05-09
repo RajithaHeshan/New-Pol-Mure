@@ -234,8 +234,10 @@ class ActivityDashboardViewModel {
                     "source":      "offer",
                     "createdAt":   Timestamp()
                 ]
-                if let yield = sellerDoc?.data()?["typicalYield"] as? String,
-                   let qty = Int(yield) { contractData["quantity"] = qty }
+                if let yield = sellerDoc?.data()?["typicalYield"] as? String {
+                    let digits = yield.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                    if let qty = Int(digits), qty > 0 { contractData["quantity"] = qty }
+                }
                 if let loc = sellerDoc?.data()?["locationName"] as? String { contractData["locationName"] = loc }
 
                 try await db.collection("contracts").addDocument(data: contractData)

@@ -108,7 +108,7 @@ struct SellerDashboardView: View {
                                 MapCircle(center: viewModel.searchCenter, radius: viewModel.searchRadius * 1000)
                                     .foregroundStyle(.orange.opacity(0.3))
 
-                                Marker("My Estate", coordinate: viewModel.searchCenter)
+                                Marker(viewModel.searchText.isEmpty ? "My Estate" : viewModel.searchText, coordinate: viewModel.searchCenter)
                                     .tint(.orange)
 
                                 ForEach(viewModel.buyersInRadius) { buyer in
@@ -186,7 +186,11 @@ struct SellerDashboardView: View {
                             } else {
                                 LazyVStack(spacing: 16) {
                                     ForEach(viewModel.urgentPosts) { post in
-                                        UrgentPostCard(post: post, buyer: viewModel.buyer(for: post))
+                                        UrgentPostCard(
+                                            post: post,
+                                            buyer: viewModel.buyer(for: post),
+                                            highestOffer: viewModel.highestUrgentPitchPerBuyer[post.buyerID]
+                                        )
                                     }
                                 }
                                 .padding(.horizontal)

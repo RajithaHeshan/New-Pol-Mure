@@ -13,11 +13,12 @@ struct Transaction: Identifiable {
     let amount: Double
     let transactionFee: Double
     let locationName: String
+    let harvestName: String
     let isCredit: Bool
     let completedAt: Date
     let source: String  // "bid" or "offer" — set at transaction creation time
 
-    var netAmount: Double { isCredit ? amount - transactionFee : amount + transactionFee }
+    var netAmount: Double { isCredit ? amount - transactionFee : amount - transactionFee }
 
     init?(id: String, data: [String: Any]) {
         guard
@@ -39,6 +40,7 @@ struct Transaction: Identifiable {
         self.amount         = amount
         self.transactionFee = data["transactionFee"] as? Double ?? 0
         self.locationName   = data["locationName"]  as? String ?? ""
+        self.harvestName    = data["harvestName"]   as? String ?? ""
         self.isCredit       = isCredit
         self.completedAt    = completedAt
         self.source         = data["source"]        as? String ?? "bid"

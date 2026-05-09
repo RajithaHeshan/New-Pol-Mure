@@ -17,6 +17,7 @@ struct Contract: Identifiable, Hashable {
     let harvestLatitude: Double?
     let harvestLongitude: Double?
     let source: String  // "bid" or "offer"
+    let harvestName: String
 
     init?(id: String, data: [String: Any]) {
         guard
@@ -45,5 +46,6 @@ struct Contract: Identifiable, Hashable {
         self.harvestLatitude  = data["harvestLatitude"]  as? Double
         self.harvestLongitude = data["harvestLongitude"] as? Double
         self.source           = data["source"]           as? String ?? "bid"
+        self.harvestName      = data["harvestName"]      as? String ?? ""
     }
 }

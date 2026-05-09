@@ -204,30 +204,31 @@ struct BuyerRowCard: View {
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
                     Text("Needs \(buyer.typicalVolume)")
+                        .font(.headline)
+                    Text(buyer.locationName)
                         .font(.caption)
                         .foregroundColor(.secondary)
                     StarRatingBadge(rating: buyer.rating, count: buyer.ratingCount)
-                    if let price = highestOffer {
-                        HStack(spacing: 3) {
-                            Image(systemName: "tag.fill")
-                                .font(.caption2)
-                            Text("Rs \(String(format: "%.0f", price))")
-                                .font(.caption.bold())
-                        }
-                        .foregroundColor(.green)
-                    }
                 }
                 .padding(.leading, 4)
 
                 Spacer()
 
-                Text("Pitch Offer")
-                    .font(.caption.bold())
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.orange)
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text("Highest Pitch")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(highestOffer.map { "Rs \(String(format: "%.0f", $0))" } ?? "—")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.orange)
+                    Text("Pitch Offer")
+                        .font(.caption.bold())
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.orange)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
             }
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground))
@@ -240,6 +241,7 @@ struct BuyerRowCard: View {
 struct UrgentPostCard: View {
     let post: UrgentRequest
     let buyer: RegisteredBuyer
+    var highestOffer: Double?
 
     var urgencyColor: Color {
         let hoursLeft = post.deadline.timeIntervalSinceNow / 3600
@@ -259,8 +261,7 @@ struct UrgentPostCard: View {
                         .font(.subheadline.bold())
                         .foregroundColor(.primary)
                     Text("\(post.quantity) Nuts · \(post.grade)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.headline)
                     HStack(spacing: 4) {
                         Image(systemName: "mappin.and.ellipse")
                             .font(.caption2)
@@ -272,9 +273,15 @@ struct UrgentPostCard: View {
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text("Highest Pitch")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(highestOffer.map { "Rs \(String(format: "%.0f", $0))" } ?? "—")
+                        .font(.subheadline.bold())
+                        .foregroundColor(urgencyColor)
                     Text(post.deadline, style: .relative)
-                        .font(.caption.bold())
+                        .font(.caption2)
                         .foregroundColor(urgencyColor)
                     Text("Pitch Offer")
                         .font(.caption.bold())

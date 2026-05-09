@@ -274,6 +274,11 @@ struct HarvestRowCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(harvest.propertyName.isEmpty ? harvest.sellerName : harvest.propertyName)
                     .font(.subheadline.bold())
+                if !harvest.propertyName.isEmpty {
+                    Text("by \(harvest.sellerName)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 Text("\(harvest.quantity) Coconuts")
                     .font(.headline)
                 Text(harvest.locationName)

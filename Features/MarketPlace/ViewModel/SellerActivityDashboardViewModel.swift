@@ -229,6 +229,9 @@ class SellerActivityDashboardViewModel {
                     }
                     if let qty = data["quantity"]     as? Int    { contractData["quantity"]     = qty }
                     if let loc = data["locationName"] as? String { contractData["locationName"] = loc }
+                    if let name = data["propertyName"] as? String, !name.isEmpty {
+                        contractData["harvestName"] = name
+                    }
                 }
             } else {
                 if let yieldStr = sellerDoc?.data()?["typicalYield"] as? String {

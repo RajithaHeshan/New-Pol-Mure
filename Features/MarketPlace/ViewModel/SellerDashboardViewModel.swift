@@ -17,7 +17,7 @@ class SellerDashboardViewModel {
         didSet { scheduleLocationSearch() }
     }
     var selectedFilter = "All"
-    let filters = ["All", "High Capacity", "Urgent Need", "Nearest to Me"]
+    let filters = ["All", "High Capacity", "Urgent Need"]
 
     var showProfile = false
     var showNotifications = false
@@ -41,8 +41,9 @@ class SellerDashboardViewModel {
     var allBuyers: [RegisteredBuyer] = []
     var isLoadingBuyers = false
 
-   
+
     var highestOfferPerBuyer: [String: Double] = [:]
+    var highestUrgentPitchPerBuyer: [String: Double] = [:]
     private let offersListenerBox = DashboardListenerBox()
     private let buyersListenerBox = DashboardListenerBox()
     private let urgentRequestsListenerBox = DashboardListenerBox()
@@ -112,16 +113,22 @@ class SellerDashboardViewModel {
                     Offer(id: $0.documentID, data: $0.data())
                 } ?? []
 
-                // Rebuild the highest-offer-per-buyer map on every snapshot
-                var map: [String: Double] = [:]
+                // Rebuild separate highest-pitch maps for normal and urgent offers
+                var normalMap: [String: Double] = [:]
+                var urgentMap: [String: Double] = [:]
                 for offer in allOffers {
-                    if let existing = map[offer.buyerID] {
-                        if offer.amount > existing { map[offer.buyerID] = offer.amount }
+                    if offer.isUrgentPitch {
+                        if (urgentMap[offer.buyerID] ?? 0) < offer.amount {
+                            urgentMap[offer.buyerID] = offer.amount
+                        }
                     } else {
-                        map[offer.buyerID] = offer.amount
+                        if (normalMap[offer.buyerID] ?? 0) < offer.amount {
+                            normalMap[offer.buyerID] = offer.amount
+                        }
                     }
                 }
-                self.highestOfferPerBuyer = map
+                self.highestOfferPerBuyer = normalMap
+                self.highestUrgentPitchPerBuyer = urgentMap
                 self.computeMLRecommendations()
 
                 // activeOffersTotal = sum of this seller's active pitches
