@@ -155,6 +155,15 @@ struct DiscoveryDashboardView: View {
                     MapCircle(center: viewModel.searchCenter, radius: viewModel.searchRadius * 1000)
                         .foregroundStyle(.blue.opacity(0.3))
                     Marker("Search Zone", coordinate: viewModel.searchCenter).tint(.blue)
+                    if let gps = viewModel.deviceLocation {
+                        Annotation("You", coordinate: gps) {
+                            ZStack {
+                                Circle().fill(Color.blue.opacity(0.2)).frame(width: 28, height: 28)
+                                Circle().fill(Color.blue).frame(width: 14, height: 14)
+                                Circle().stroke(Color.white, lineWidth: 2).frame(width: 14, height: 14)
+                            }
+                        }
+                    }
                     ForEach(viewModel.sellersInRadius) { seller in
                         Annotation(seller.sellerName, coordinate: seller.coordinate) {
                             Image(systemName: "leaf.fill")

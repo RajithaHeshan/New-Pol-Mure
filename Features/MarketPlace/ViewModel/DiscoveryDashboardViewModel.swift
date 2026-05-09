@@ -3,17 +3,22 @@ import SwiftUI
 import MapKit
 import FirebaseFirestore
 import UserNotifications
+import CoreLocation
 
 @Observable
 @MainActor
-class DiscoveryDashboardViewModel {
+class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
+
+    // MARK: - Real Device GPS
+    private let locationManager = CLLocationManager()
+    var deviceLocation: CLLocationCoordinate2D? = nil
 
     var searchText = "" {
         didSet { scheduleLocationSearch() } 
     }
   
     var selectedFilter = "All"
-    let filters = ["All", "High Volume", "Ending Soon", "Nearest to Me"]
+    let filters = ["All", "High Volume", "Ending Soon"]
 
     var showProfile = false
     var showNotifications = false
@@ -66,7 +71,9 @@ class DiscoveryDashboardViewModel {
     var mlRecommendedSellers: [SellerLocation] = []
     var mlRecommendedHarvests: [HarvestLotItem] = []
 
-    init() {
+    override init() {
+        super.init()
+        setupLocationManager()
         fetchUserProfile()
         attachSellersListener()
         attachBidsListener()
@@ -75,6 +82,24 @@ class DiscoveryDashboardViewModel {
         attachContractsListener()
         attachMonthlySpendListener()
         requestNotificationPermission()
+    }
+
+    private func setupLocationManager() {
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.requestWhenInUseAuthorization()
+        locationManager.startUpdatingLocation()
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let latest = locations.last else { return }
+        Task { @MainActor in
+            self.deviceLocation = latest.coordinate
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("Location error: \(error.localizedDescription)")
     }
 
     // MARK: - Firebase Fetch Logic
@@ -141,7 +166,7 @@ class DiscoveryDashboardViewModel {
             return
         }
 
-        // Remove existing listener before re-attaching
+        
         monthlySpendListener?.remove()
 
         let calendar = Calendar.current
@@ -235,13 +260,13 @@ class DiscoveryDashboardViewModel {
                     let data = doc.data()
                     guard let amount = data["amount"] as? Double else { continue }
 
-                    // Index by harvestID for harvest lot bids
+
                     if let harvestID = data["harvestID"] as? String, !harvestID.isEmpty {
                         if (bids[harvestID] ?? 0) < amount {
                             bids[harvestID] = amount
                         }
                     }
-                    // Index by sellerID for registered-seller bids
+
                     if let sellerID = data["sellerID"] as? String, !sellerID.isEmpty {
                         if (bids[sellerID] ?? 0) < amount {
                             bids[sellerID] = amount
@@ -266,23 +291,24 @@ class DiscoveryDashboardViewModel {
 
     var harvestsInRadius: [HarvestLotItem] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
+        let gpsLocation = deviceLocation.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
+        let radiusCenter = (selectedFilter == "Nearest to Me" ? gpsLocation : nil) ?? centerLocation
 
         var results = activeHarvests.filter { harvest in
             let harvestLocation = CLLocation(latitude: harvest.latitude, longitude: harvest.longitude)
-            return (harvestLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
+            return (harvestLocation.distance(from: radiusCenter) / 1000.0) <= searchRadius
         }
 
         switch selectedFilter {
         case "High Volume":
             results = results.filter { $0.quantity >= 5000 }
         case "Ending Soon":
-            // Within the next 2 days
             results = results.filter { $0.endDate.timeIntervalSinceNow < 172800 && $0.endDate > Date() }
         case "Nearest to Me":
             results.sort { h1, h2 in
                 let loc1 = CLLocation(latitude: h1.latitude, longitude: h1.longitude)
                 let loc2 = CLLocation(latitude: h2.latitude, longitude: h2.longitude)
-                return loc1.distance(from: centerLocation) < loc2.distance(from: centerLocation)
+                return loc1.distance(from: radiusCenter) < loc2.distance(from: radiusCenter)
             }
         default:
             break
@@ -291,7 +317,7 @@ class DiscoveryDashboardViewModel {
         return results
     }
 
-    //attached sellers ratings
+   
     private func attachSellerRatingsListener() {
         sellerRatingsListener = Firestore.firestore()
             .collection("users")
@@ -433,7 +459,7 @@ class DiscoveryDashboardViewModel {
         return response?.mapItems.first?.placemark.coordinate
     }
 
-    // MARK: - Location Search (Moves map center when user types in search bar)
+   
     private func scheduleLocationSearch() {
         searchTask?.cancel()
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -470,17 +496,18 @@ class DiscoveryDashboardViewModel {
     
     var sellersInRadius: [SellerLocation] {
         let centerLocation = CLLocation(latitude: searchCenter.latitude, longitude: searchCenter.longitude)
+        let gpsLocation = deviceLocation.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
+        let radiusCenter = (selectedFilter == "Nearest to Me" ? gpsLocation : nil) ?? centerLocation
 
         var results = allSellers.filter { seller in
             let sellerLocation = CLLocation(latitude: seller.coordinate.latitude, longitude: seller.coordinate.longitude)
-            return (sellerLocation.distance(from: centerLocation) / 1000.0) <= searchRadius
+            return (sellerLocation.distance(from: radiusCenter) / 1000.0) <= searchRadius
         }
 
         switch selectedFilter {
         case "High Volume":
             results = results.filter { RecommendationEngine.parseVolume($0.typicalYield) >= 5000 }
         case "Ending Soon":
-            // Harvest date within the next 2 days and not already past
             results = results.filter {
                 let t = $0.nextHarvestDate.timeIntervalSinceNow
                 return t > 0 && t < 172800
@@ -489,7 +516,7 @@ class DiscoveryDashboardViewModel {
             results.sort { s1, s2 in
                 let loc1 = CLLocation(latitude: s1.coordinate.latitude, longitude: s1.coordinate.longitude)
                 let loc2 = CLLocation(latitude: s2.coordinate.latitude, longitude: s2.coordinate.longitude)
-                return loc1.distance(from: centerLocation) < loc2.distance(from: centerLocation)
+                return loc1.distance(from: radiusCenter) < loc2.distance(from: radiusCenter)
             }
         default:
             break
