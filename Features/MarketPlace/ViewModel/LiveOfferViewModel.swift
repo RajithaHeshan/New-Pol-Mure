@@ -141,11 +141,19 @@ class LiveOfferViewModel {
 
     private func scheduleNewOfferNotification(amount: Double) {
         let buyerID = buyer.id
-        let title   = "New Offer Received!"
-        let body    = "\(self.currentSellerName) pitched Rs \(String(format: "%.0f", amount)) to you. Review it in Activity → Offers."
+        let title: String
+        let body: String
+
+        if isUrgentPitch {
+            title = "🔥 Urgent Pitch Received!"
+            body  = "\(self.currentSellerName) pitched Rs \(String(format: "%.0f", amount)) on your urgent post. Review it in Activity → Offers."
+        } else {
+            title = "New Offer Received!"
+            body  = "\(self.currentSellerName) pitched Rs \(String(format: "%.0f", amount)) to you. Review it in Activity → Offers."
+        }
 
         Task { @MainActor in
-            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: "offer")
+            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: isUrgentPitch ? "urgent_offer" : "offer")
         }
 
         UNUserNotificationCenter.current().getNotificationSettings { settings in
@@ -165,11 +173,19 @@ class LiveOfferViewModel {
     private func scheduleOutpitchedNotification(newAmount: Double, sellerName: String) {
         let buyerName = buyer.name
         let buyerID   = buyer.id
-        let title     = "You've Been Outpitched!"
-        let body      = "\(sellerName) offered Rs \(String(format: "%.0f", newAmount)) to \(buyerName). Pitch higher to stay in."
+        let title: String
+        let body: String
+
+        if isUrgentPitch {
+            title = "🔥 Outpitched on Urgent Post!"
+            body  = "\(sellerName) offered Rs \(String(format: "%.0f", newAmount)) on \(buyerName)'s urgent post. Pitch higher to stay in."
+        } else {
+            title = "You've Been Outpitched!"
+            body  = "\(sellerName) offered Rs \(String(format: "%.0f", newAmount)) to \(buyerName). Pitch higher to stay in."
+        }
 
         Task { @MainActor in
-            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: "outpitched")
+            NotificationStore.shared.add(ownerID: currentSellerID, title: title, body: body, type: isUrgentPitch ? "urgent_outpitched" : "outpitched")
         }
 
         UNUserNotificationCenter.current().getNotificationSettings { settings in

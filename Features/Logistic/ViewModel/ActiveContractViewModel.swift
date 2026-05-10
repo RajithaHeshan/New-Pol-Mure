@@ -285,11 +285,14 @@ class ActiveContractViewModel {
                 "completedAt":    now
             ]
 
-            try? await db.collection("transactions").addDocument(data: buyerTx)
-            try? await db.collection("transactions").addDocument(data: sellerTx)
-            try? await db.collection("contracts").document(contractID)
-                .updateData(["status": "qualityApproved"])
-
+            do {
+                try await db.collection("transactions").addDocument(data: buyerTx)
+                try await db.collection("transactions").addDocument(data: sellerTx)
+                try await db.collection("contracts").document(contractID)
+                    .updateData(["status": "qualityApproved"])
+            } catch {
+                print("Release funds error: \(error.localizedDescription)")
+            }
             isReleasingFunds = false
             // Rating sheet fires when the contract listener receives "completed" (after seller confirms handover)
         }

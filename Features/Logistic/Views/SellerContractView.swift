@@ -218,12 +218,10 @@ struct ContractSummaryCard: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 4) {
-                if volume.isEmpty {
-                    Text("Contract Value").font(.caption).foregroundColor(.secondary)
-                    Text("Rs \(amount, specifier: "%.2f")").font(.headline.bold()).foregroundColor(.primary)
-                } else {
-                    Text("Volume").font(.caption).foregroundColor(.secondary)
-                    Text("\(volume) Nuts").font(.headline.bold()).foregroundColor(.primary)
+                Text("Contract Value").font(.caption).foregroundColor(.secondary)
+                Text("Rs \(amount, specifier: "%.2f")").font(.headline.bold()).foregroundColor(.primary)
+                if !volume.isEmpty {
+                    Text("\(volume) Nuts").font(.caption).foregroundColor(.secondary)
                 }
             }
         }

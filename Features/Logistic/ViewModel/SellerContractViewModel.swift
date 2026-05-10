@@ -262,7 +262,8 @@ class SellerContractViewModel {
                     .updateData(["status": "completed"])
 
                 withAnimation(.spring()) { currentState = .completed }
-              
+
+                checkIfAlreadyRated(sellerID: sellerID)
                 showRatingSheet = true
             } catch {
                 print("Confirm handover error: \(error.localizedDescription)")

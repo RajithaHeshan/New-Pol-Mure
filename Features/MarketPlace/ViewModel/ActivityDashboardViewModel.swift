@@ -294,11 +294,19 @@ class ActivityDashboardViewModel {
 
   
     private func scheduleNewOfferNotification(offer: Offer) {
-        let title = "New Pitch from a Seller!"
-        let body  = "\(offer.sellerName) offered Rs \(String(format: "%.0f", offer.amount)). Tap to Accept or Decline in Activity → Offers."
+        let title: String
+        let body: String
+
+        if offer.isUrgentPitch {
+            title = "🔥 Urgent Pitch on Your Post!"
+            body  = "\(offer.sellerName) pitched Rs \(String(format: "%.0f", offer.amount)) on your urgent post. Tap to Accept or Decline in Activity → Offers."
+        } else {
+            title = "New Pitch from a Seller!"
+            body  = "\(offer.sellerName) offered Rs \(String(format: "%.0f", offer.amount)). Tap to Accept or Decline in Activity → Offers."
+        }
 
         Task { @MainActor in
-            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: "offer")
+            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: offer.isUrgentPitch ? "urgent_offer" : "offer")
         }
 
         UNUserNotificationCenter.current().getNotificationSettings { settings in
