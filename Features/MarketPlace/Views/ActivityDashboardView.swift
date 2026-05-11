@@ -318,8 +318,15 @@ struct TransactionDetailCard: View {
                     .font(.title2)
                     .foregroundColor(tx.isCredit ? .green : .blue)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(tx.isCredit ? "Payment Received" : "Payment Made")
-                        .font(.headline)
+                    HStack(spacing: 5) {
+                        if tx.isUrgent {
+                            Image(systemName: "flame.fill")
+                                .font(.subheadline)
+                                .foregroundColor(.orange)
+                        }
+                        Text(tx.isCredit ? "Payment Received" : "Payment Made")
+                            .font(.headline)
+                    }
                     Text("Contract \(tx.contractRef)")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -344,8 +351,12 @@ struct TransactionDetailCard: View {
                 if !tx.harvestName.isEmpty {
                     txRow(icon: "basket.fill", label: "Harvest", value: tx.harvestName)
                 }
-                txRow(icon: "leaf.fill", label: "Quantity", value: "\(tx.quantity) Coconuts")
-                txRow(icon: "scalemass.fill", label: "Price / Nut", value: "Rs \(String(format: "%.2f", tx.pricePerNut))")
+                if tx.quantity > 0 {
+                    txRow(icon: "leaf.fill", label: "Quantity", value: "\(tx.quantity) Coconuts")
+                }
+                if tx.quantity > 0 && tx.pricePerNut > 0 {
+                    txRow(icon: "scalemass.fill", label: "Price / Nut", value: "Rs \(String(format: "%.2f", tx.pricePerNut))")
+                }
                 txRow(icon: "percent", label: "Platform Fee (2%)", value: "Rs \(String(format: "%.2f", tx.transactionFee))")
                 if !tx.locationName.isEmpty {
                     txRow(icon: "mappin.and.ellipse", label: "Location", value: tx.locationName)
@@ -356,6 +367,11 @@ struct TransactionDetailCard: View {
         }
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
+        .overlay(
+            tx.isUrgent
+                ? RoundedRectangle(cornerRadius: 16).stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                : nil
+        )
     }
 
     private func txRow(icon: String, label: String, value: String) -> some View {

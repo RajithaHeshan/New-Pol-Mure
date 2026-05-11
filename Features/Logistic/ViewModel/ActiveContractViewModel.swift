@@ -20,7 +20,7 @@ class ActiveContractViewModel {
     var isLocationRevealed = false
     var showDisputeModal   = false
     var isPulsing          = false
-    var isDisputePending   = false   // true while seller hasn't responded yet
+    var isDisputePending   = false   
 
     
     let contractID:  String
@@ -37,6 +37,7 @@ class ActiveContractViewModel {
     var sellerYield:        String = ""
     let amount:      Double
     let harvestName: String
+    let isUrgent:    Bool
 
     
     var buyerCoordinate:  CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 6.9271, longitude: 79.8612)
@@ -72,6 +73,7 @@ class ActiveContractViewModel {
         self.contractSource       = contract.source
         self.amount               = contract.amount
         self.harvestName          = contract.harvestName
+        self.isUrgent             = contract.isUrgent
 
         self.currentState       = Self.mapStatus(contract.status)
         self.isDisputePending   = contract.status == "dispute"
@@ -248,7 +250,7 @@ class ActiveContractViewModel {
             let now = Timestamp()
             let fee = amount * 0.02  // 2% platform fee
             let loc = contractLocationName.isEmpty ? sellerLocationName : contractLocationName
-            let pricePerNut = quantity > 0 ? amount / Double(quantity) : amount
+            let pricePerNut = quantity > 0 ? amount / Double(quantity) : 0
 
             // Buyer transaction — outgoing payment
             let buyerTx: [String: Any] = [
@@ -264,6 +266,7 @@ class ActiveContractViewModel {
                 "locationName":   loc,
                 "harvestName":    harvestName,
                 "source":         contractSource,
+                "isUrgent":       isUrgent,
                 "isCredit":       false,
                 "completedAt":    now
             ]
@@ -281,6 +284,7 @@ class ActiveContractViewModel {
                 "locationName":   loc,
                 "harvestName":    harvestName,
                 "source":         contractSource,
+                "isUrgent":       isUrgent,
                 "isCredit":       true,
                 "completedAt":    now
             ]

@@ -147,7 +147,8 @@ struct FaceIDLockView: View {
         var nsError: NSError?
 
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &nsError) else {
-            errorMessage = "Face ID not available. Use your passcode or password."
+            // Biometrics not available — stay on Face ID screen, show message
+            errorMessage = "Face ID not available. Use Passcode to continue."
             return
         }
 
@@ -167,11 +168,10 @@ struct FaceIDLockView: View {
                     switch err.code {
                     case .userCancel, .appCancel, .systemCancel:
                         break
-                    case .biometryLockout, .authenticationFailed:
-                        // Face ID locked out or failed — go straight to PIN
+                    case .biometryLockout, .authenticationFailed, .biometryNotAvailable, .biometryNotEnrolled:
                         screen = .pin
                     default:
-                        errorMessage = "Face ID failed. Use your passcode or password."
+                        screen = .pin
                     }
                 }
             }

@@ -43,6 +43,8 @@ class SellerContractViewModel {
     // MARK: - Action States
     var isConfirmingHandover = false
     var isCancellingContract = false
+    var hasVerifiedQuality   = false   // seller must tap Verify Quality before handover unlocks
+    var hasReviewedDispute   = false   // seller must tap Review Dispute before accept/cancel unlock
 
     // MARK: - Rating
     var showRatingSheet  = false
@@ -182,11 +184,15 @@ class SellerContractViewModel {
                     self.originalPrice = data["originalAmount"]     as? Double ?? self.amount
                     self.disputeReason = data["reason"] as? String ?? ""
                     self.disputeNotes  = data["notes"]  as? String ?? ""
+                    if !self.isDisputed {
+                        self.hasReviewedDispute = false  // reset on each new dispute
+                    }
                     self.isDisputed    = true
                 } else {
-                    self.isDisputed    = false
-                    self.disputeReason = ""
-                    self.disputeNotes  = ""
+                    self.isDisputed         = false
+                    self.hasReviewedDispute = false
+                    self.disputeReason      = ""
+                    self.disputeNotes       = ""
                 }
             }
     }

@@ -235,8 +235,8 @@ class SellerActivityDashboardViewModel {
                 }
             } else {
                 if let yieldStr = sellerDoc?.data()?["typicalYield"] as? String {
-                    let digits = yieldStr.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
-                    if let qty = Int(digits) { contractData["quantity"] = qty }
+                    let qty = RecommendationEngine.parseVolume(yieldStr)
+                    if qty > 0 { contractData["quantity"] = qty }
                 }
                 if let loc = sellerDoc?.data()?["locationName"] as? String {
                     contractData["locationName"] = loc

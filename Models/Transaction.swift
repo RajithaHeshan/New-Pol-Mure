@@ -17,6 +17,7 @@ struct Transaction: Identifiable {
     let isCredit: Bool
     let completedAt: Date
     let source: String  // "bid" or "offer" — set at transaction creation time
+    let isUrgent: Bool  // true when transaction originated from an urgent post pitch
 
     var netAmount: Double { isCredit ? amount - transactionFee : amount - transactionFee }
 
@@ -44,5 +45,6 @@ struct Transaction: Identifiable {
         self.isCredit       = isCredit
         self.completedAt    = completedAt
         self.source         = data["source"]        as? String ?? "bid"
+        self.isUrgent       = data["isUrgent"]      as? Bool   ?? false
     }
 }

@@ -30,6 +30,8 @@ class SellerDashboardViewModel {
 
 
     var searchCenter = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
+    // Seller's own registered estate coordinate — fixed for ML scoring, never moves with search
+    private var sellerCoordinate = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
     var searchRadius: Double = 50.0
     var isFullScreenMapPresented = false
 
@@ -301,7 +303,9 @@ class SellerDashboardViewModel {
                 // Center map on seller's own estate location
                 if let lat = data["latitude"] as? Double,
                    let lng = data["longitude"] as? Double {
-                    self.searchCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                    let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                    self.searchCenter    = coord
+                    self.sellerCoordinate = coord  // fixed reference for ML scoring — never moves with search
                 }
 
                 // Decode seller profile for ML scoring
@@ -378,9 +382,16 @@ class SellerDashboardViewModel {
 
 
     
-    private func attachContractsHistoryListener() {
+    private func attachContractsHistoryListener(retryCount: Int = 0) {
         let sellerID = AuthManager.shared.currentUserID
-        guard !sellerID.isEmpty else { return }
+        if sellerID.isEmpty {
+            guard retryCount < 5 else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                attachContractsHistoryListener(retryCount: retryCount + 1)
+            }
+            return
+        }
 
         historyListenerBox.listener = Firestore.firestore()
             .collection("contracts")
@@ -417,7 +428,7 @@ class SellerDashboardViewModel {
             let score = engine.scoreBuyerForSeller(
                 sellerVolume: sellerVolume,
                 buyerVolume: buyerVolume,
-                sellerLocation: searchCenter,
+                sellerLocation: sellerCoordinate,
                 buyerLocation: buyer.coordinate,
                 sellerHasExport: sellerHasExport,
                 buyerNeedsExport: buyerNeedsExport,

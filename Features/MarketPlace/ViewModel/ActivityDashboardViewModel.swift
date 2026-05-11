@@ -221,6 +221,7 @@ class ActivityDashboardViewModel {
 
 
                 let sellerDoc = try? await db.collection("users").document(offer.sellerID).getDocument()
+                let sellerData = sellerDoc?.data() ?? [:]
 
                 let contractRef = "#\(Int.random(in: 1000...9999))"
                 var contractData: [String: Any] = [
@@ -232,13 +233,34 @@ class ActivityDashboardViewModel {
                     "status":      "escrow",
                     "amount":      offer.amount,
                     "source":      "offer",
+                    "isUrgent":    offer.isUrgentPitch,
                     "createdAt":   Timestamp()
                 ]
-                if let yield = sellerDoc?.data()?["typicalYield"] as? String {
-                    let digits = yield.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
-                    if let qty = Int(digits), qty > 0 { contractData["quantity"] = qty }
+
+                // Try typicalYield from profile first
+                var resolvedQty = 0
+                if let yield = sellerData["typicalYield"] as? String {
+                    resolvedQty = RecommendationEngine.parseVolume(yield)
                 }
-                if let loc = sellerDoc?.data()?["locationName"] as? String { contractData["locationName"] = loc }
+                // Fall back to latest active harvest lot quantity
+                if resolvedQty == 0 {
+                    let harvestSnap = try? await db.collection("harvestLots")
+                        .whereField("sellerID", isEqualTo: offer.sellerID)
+                        .getDocuments()
+                    if let latestHarvest = harvestSnap?.documents.first {
+                        let hData = latestHarvest.data()
+                        resolvedQty = hData["quantity"] as? Int ?? 0
+                        if let hName = hData["propertyName"] as? String, !hName.isEmpty {
+                            contractData["harvestName"] = hName
+                        }
+                        if let lat = hData["latitude"] as? Double, let lng = hData["longitude"] as? Double {
+                            contractData["harvestLatitude"]  = lat
+                            contractData["harvestLongitude"] = lng
+                        }
+                    }
+                }
+                if resolvedQty > 0 { contractData["quantity"] = resolvedQty }
+                if let loc = sellerData["locationName"] as? String { contractData["locationName"] = loc }
 
                 try await db.collection("contracts").addDocument(data: contractData)
 

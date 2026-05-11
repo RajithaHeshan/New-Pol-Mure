@@ -27,12 +27,13 @@ struct SellerContractView: View {
 
                         if viewModel.isDisputed {
                             SellerDisputeAlertCard(
-                                reason:        viewModel.disputeReason,
-                                notes:         viewModel.disputeNotes,
-                                originalPrice: viewModel.originalPrice,
-                                counterOffer:  viewModel.counterOffer,
-                                onAccept:      { viewModel.acceptNewPrice() },
-                                onCancel:      { viewModel.cancelContract() }
+                                reason:           viewModel.disputeReason,
+                                notes:            viewModel.disputeNotes,
+                                originalPrice:    viewModel.originalPrice,
+                                counterOffer:     viewModel.counterOffer,
+                                hasReviewed:      $viewModel.hasReviewedDispute,
+                                onAccept:         { viewModel.acceptNewPrice() },
+                                onCancel:         { viewModel.cancelContract() }
                             )
                             .padding(.horizontal)
                         }
@@ -49,6 +50,10 @@ struct SellerContractView: View {
                             calendarSchedulingCard
                         }
                         
+                        if viewModel.currentState == .qualityApproved && !viewModel.hasVerifiedQuality {
+                            qualityApprovedInfoCard
+                        }
+
                         SellerFSMTracker(currentState: viewModel.currentState)
                             .padding(.horizontal)
                         
@@ -95,6 +100,28 @@ struct SellerContractView: View {
         .padding(.horizontal)
     }
     
+    private var qualityApprovedInfoCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.shield.fill")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Buyer Approved Quality")
+                        .font(.subheadline.bold())
+                    Text("Please physically verify the coconut quality before confirming handover.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding()
+        .background(Color.blue.opacity(0.07))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue.opacity(0.3), lineWidth: 1))
+        .padding(.horizontal)
+    }
+
     private var calendarSchedulingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -162,26 +189,60 @@ struct SellerContractView: View {
                 .padding(.bottom, 20)
 
             } else if viewModel.currentState == .qualityApproved {
-                // Buyer approved quality — seller can now confirm handover
-                Button(action: {
-                    withAnimation { viewModel.confirmHandover() }
-                }) {
-                    if viewModel.isConfirmingHandover {
-                        ProgressView()
-                            .tint(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                VStack(spacing: 12) {
+                    // Step 1 — Verify Quality (must tap before handover unlocks)
+                    if !viewModel.hasVerifiedQuality {
+                        Button(action: {
+                            withAnimation(.spring()) { viewModel.hasVerifiedQuality = true }
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        }) {
+                            Label("Verify Quality", systemImage: "checkmark.seal.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                        }
+
+                        Text("Tap to confirm you have physically checked the coconut quality.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 4)
                     } else {
-                        Label("Confirm Handover", systemImage: "box.truck.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                        // Quality verified badge
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.seal.fill").foregroundColor(.green)
+                            Text("Quality Verified").font(.subheadline.bold()).foregroundColor(.green)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.green.opacity(0.1))
+                        .cornerRadius(10)
                     }
+
+                    // Step 2 — Confirm Handover (enabled only after quality verified)
+                    Button(action: {
+                        withAnimation { viewModel.confirmHandover() }
+                    }) {
+                        if viewModel.isConfirmingHandover {
+                            ProgressView()
+                                .tint(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        } else {
+                            Label("Confirm Handover", systemImage: "box.truck.fill")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        }
+                    }
+                    .background(viewModel.hasVerifiedQuality ? Color.green : Color.secondary.opacity(0.3))
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                    .disabled(!viewModel.hasVerifiedQuality || viewModel.isConfirmingHandover)
                 }
-                .background(Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .disabled(viewModel.isConfirmingHandover)
                 .padding(.horizontal)
                 .padding(.bottom, 20)
                 .background(LinearGradient(gradient: Gradient(colors: [Color(UIColor.systemGroupedBackground).opacity(0.0), Color(UIColor.systemGroupedBackground)]), startPoint: .top, endPoint: .bottom).padding(.top, -20))
@@ -234,6 +295,7 @@ struct SellerDisputeAlertCard: View {
     let notes:         String
     let originalPrice: Double
     let counterOffer:  Double
+    @Binding var hasReviewed: Bool
     let onAccept:      () -> Void
     let onCancel:      () -> Void
 
@@ -277,13 +339,57 @@ struct SellerDisputeAlertCard: View {
             }
             .padding().background(Color.red.opacity(0.05)).cornerRadius(8)
 
-            HStack(spacing: 12) {
-                Button(action: { withAnimation { onAccept() } }) {
-                    Text("Accept New Price").font(.subheadline.bold()).frame(maxWidth: .infinity).padding(.vertical, 12).background(Color.green).foregroundColor(.white).cornerRadius(10)
+            // Step 1 — Review Dispute gate
+            if !hasReviewed {
+                Button(action: {
+                    withAnimation(.spring()) { hasReviewed = true }
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                }) {
+                    Label("Review Dispute", systemImage: "doc.text.magnifyingglass")
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
                 }
 
-                Button(action: { onCancel() }) {
-                    Text("Cancel Contract").font(.subheadline.bold()).frame(maxWidth: .infinity).padding(.vertical, 12).background(Color.red.opacity(0.1)).foregroundColor(.red).cornerRadius(10)
+                Text("Tap to review the buyer's dispute before responding.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                // Reviewed badge
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill").foregroundColor(.orange)
+                    Text("Dispute Reviewed").font(.caption.bold()).foregroundColor(.orange)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+
+                // Step 2 — Accept / Cancel (unlocked only after review)
+                HStack(spacing: 12) {
+                    Button(action: { withAnimation { onAccept() } }) {
+                        Text("Accept New Price")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+
+                    Button(action: { onCancel() }) {
+                        Text("Cancel Contract")
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.red.opacity(0.1))
+                            .foregroundColor(.red)
+                            .cornerRadius(10)
+                    }
                 }
             }
         }

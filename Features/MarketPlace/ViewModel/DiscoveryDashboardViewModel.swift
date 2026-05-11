@@ -62,6 +62,8 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
     // MARK: - Buyer Profile (used by ML engine)
     private var buyerVolume: Int = 5000
     private var buyerNeedsExport: Bool = false
+    // Buyer's own registered coordinate — never changes with search; used for ML scoring
+    private var buyerCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
 
     // MARK: - Historical Transactions Per Seller (sellerID → count of completed contracts)
     private var historicalTransactions: [String: Int] = [:]
@@ -143,10 +145,11 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
                 // Centre map on buyer's registered location
                 if let lat = data["latitude"] as? Double,
                    let lng = data["longitude"] as? Double {
-                    self.searchCenter = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                    let coord = CLLocationCoordinate2D(latitude: lat, longitude: lng)
+                    self.searchCenter    = coord
+                    self.buyerCoordinate = coord  // fixed reference for ML scoring — never moves with search
                 }
 
-                //buyer profile is loaded with correct side
                 self.computeMLRecommendations()
             } catch {
                 print("Error fetching profile from Firestore: \(error.localizedDescription)")
@@ -326,12 +329,29 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
                 guard let self, let docs = snapshot?.documents else { return }
                 var map: [String: (Double, Int)] = [:]
                 for doc in docs {
-                    let data = doc.data()
+                    let data  = doc.data()
                     let avg   = data["averageRating"] as? Double ?? 0.0
                     let count = data["ratingCount"]   as? Int    ?? 0
                     map[doc.documentID] = (avg, count)
                 }
                 self.sellerRatings = map
+
+                // Propagate fresh ratings into allSellers so ML scores reflect latest ratings
+                self.allSellers = self.allSellers.map { seller in
+                    guard let updated = map[seller.id] else { return seller }
+                    return SellerLocation(
+                        id:                 seller.id,
+                        sellerName:         seller.sellerName,
+                        locationName:       seller.locationName,
+                        coordinate:         seller.coordinate,
+                        typicalYield:       seller.typicalYield,
+                        certificationLevel: seller.certificationLevel,
+                        nextHarvestDate:    seller.nextHarvestDate,
+                        averageRating:      updated.0,
+                        ratingCount:        updated.1
+                    )
+                }
+                self.computeMLRecommendations()
             }
     }
 
@@ -361,10 +381,18 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
     }
 
    
-    private func attachContractsListener() {
+    private func attachContractsListener(retryCount: Int = 0) {
         let buyerID = AuthManager.shared.currentUserID
-        guard !buyerID.isEmpty else { return }
+        if buyerID.isEmpty {
+            guard retryCount < 5 else { return }
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                attachContractsListener(retryCount: retryCount + 1)
+            }
+            return
+        }
 
+        contractsListener?.remove()
         contractsListener = Firestore.firestore()
             .collection("contracts")
             .whereField("buyerID", isEqualTo: buyerID)
@@ -400,7 +428,7 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
                 let score = engine.scoreSellerForBuyer(
                     buyerVolume: buyerVolume,
                     sellerVolume: sellerVolume,
-                    buyerLocation: searchCenter,
+                    buyerLocation: buyerCoordinate,
                     sellerLocation: seller.coordinate,
                     buyerNeedsExport: buyerNeedsExport,
                     sellerHasExport: sellerHasExport,
@@ -429,7 +457,7 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
                 let score = engine.scoreSellerForBuyer(
                     buyerVolume: buyerVolume,
                     sellerVolume: harvestVolume,
-                    buyerLocation: searchCenter,
+                    buyerLocation: buyerCoordinate,
                     sellerLocation: harvestLocation,
                     buyerNeedsExport: buyerNeedsExport,
                     sellerHasExport: harvestHasExport,
