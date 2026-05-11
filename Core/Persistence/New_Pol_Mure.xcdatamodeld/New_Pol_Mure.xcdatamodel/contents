@@ -4,4 +4,81 @@
         <attribute name="role" optional="YES" attributeType="String"/>
         <attribute name="userId" optional="YES" attributeType="String"/>
     </entity>
+    <entity name="CachedUserProfile" representedClassName="CachedUserProfile" syncable="YES" codeGenerationType="class">
+        <attribute name="userId" optional="YES" attributeType="String"/>
+        <attribute name="fullName" optional="YES" attributeType="String"/>
+        <attribute name="role" optional="YES" attributeType="String"/>
+        <attribute name="locationName" optional="YES" attributeType="String"/>
+        <attribute name="latitude" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="longitude" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="profileImageName" optional="YES" attributeType="String"/>
+        <attribute name="typicalVolume" optional="YES" attributeType="String"/>
+        <attribute name="typicalYield" optional="YES" attributeType="String"/>
+        <attribute name="certificationLevel" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedContract" representedClassName="CachedContract" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="contractRef" optional="YES" attributeType="String"/>
+        <attribute name="buyerID" optional="YES" attributeType="String"/>
+        <attribute name="buyerName" optional="YES" attributeType="String"/>
+        <attribute name="sellerID" optional="YES" attributeType="String"/>
+        <attribute name="sellerName" optional="YES" attributeType="String"/>
+        <attribute name="status" optional="YES" attributeType="String"/>
+        <attribute name="amount" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="quantity" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="locationName" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="source" optional="YES" attributeType="String"/>
+        <attribute name="ownerID" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedBid" representedClassName="CachedBid" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="sellerID" optional="YES" attributeType="String"/>
+        <attribute name="sellerName" optional="YES" attributeType="String"/>
+        <attribute name="bidderID" optional="YES" attributeType="String"/>
+        <attribute name="bidderName" optional="YES" attributeType="String"/>
+        <attribute name="harvestID" optional="YES" attributeType="String"/>
+        <attribute name="amount" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="status" optional="YES" attributeType="String"/>
+        <attribute name="placedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="ownerID" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedOffer" representedClassName="CachedOffer" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="buyerID" optional="YES" attributeType="String"/>
+        <attribute name="buyerName" optional="YES" attributeType="String"/>
+        <attribute name="sellerID" optional="YES" attributeType="String"/>
+        <attribute name="sellerName" optional="YES" attributeType="String"/>
+        <attribute name="amount" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="status" optional="YES" attributeType="String"/>
+        <attribute name="placedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="isUrgentPitch" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="ownerID" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedTransaction" representedClassName="CachedTransaction" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="contractRef" optional="YES" attributeType="String"/>
+        <attribute name="buyerID" optional="YES" attributeType="String"/>
+        <attribute name="buyerName" optional="YES" attributeType="String"/>
+        <attribute name="sellerID" optional="YES" attributeType="String"/>
+        <attribute name="sellerName" optional="YES" attributeType="String"/>
+        <attribute name="quantity" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="pricePerNut" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="amount" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="transactionFee" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="locationName" optional="YES" attributeType="String"/>
+        <attribute name="isCredit" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="source" optional="YES" attributeType="String"/>
+        <attribute name="ownerID" optional="YES" attributeType="String"/>
+    </entity>
+    <entity name="CachedNotification" representedClassName="CachedNotification" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="String"/>
+        <attribute name="ownerID" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="body" optional="YES" attributeType="String"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
+        <attribute name="isRead" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="receivedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
 </model>

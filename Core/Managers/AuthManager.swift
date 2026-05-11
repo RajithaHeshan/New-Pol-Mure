@@ -75,6 +75,18 @@ class AuthManager {
     }
     
 
+   
+    var currentUserID: String {
+        let request: NSFetchRequest<LocalSession> = LocalSession.fetchRequest()
+        let results = try? context.fetch(request)
+        return results?.first?.userId ?? Auth.auth().currentUser?.uid ?? ""
+    }
+
+   
+    func refreshSession(userId: String, role: String) {
+        saveLocalSession(userId: userId, role: role)
+    }
+
     func signOut() {
         do { try Auth.auth().signOut() } catch { print("Error signing out: \(error.localizedDescription)") }
         let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "LocalSession")

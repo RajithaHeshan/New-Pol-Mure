@@ -1,57 +1,49 @@
 
 import SwiftUI
-import LocalAuthentication
+import FirebaseAuth
 
 @Observable
 @MainActor
 class AuthViewModel {
-    // State Variables for the UI
     var email = ""
     var password = ""
     var errorMessage = ""
-    var demoRoleSelection = "Buyer"
-    
-    // MARK: - Email/Password Login (Firebase + Core Data)
-    func signInWithEmail(completion: @escaping (Bool, String, String) -> Void) {
-        
-        // THE FIX: Strip out invisible trailing spaces added by the iOS keyboard
+    var isLoading = false
+
+    // MARK: - Email/Password Login
+    func signInWithEmail() async -> (success: Bool, role: String) {
         let safeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        Task {
-            do {
-                // Pass the cleaned credentials to the Hybrid Data Manager
-                let role = try await AuthManager.shared.loginUser(email: safeEmail, password: password)
-                
-                DispatchQueue.main.async {
-                    completion(true, role, "")
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(false, "", error.localizedDescription)
-                }
-            }
+        guard !safeEmail.isEmpty, !password.isEmpty else {
+            errorMessage = "Please enter your email and password."
+            return (false, "")
+        }
+        isLoading = true
+        errorMessage = ""
+        do {
+            let role = try await AuthManager.shared.loginUser(email: safeEmail, password: password)
+            isLoading = false
+            return (true, role)
+        } catch {
+            isLoading = false
+            errorMessage = error.localizedDescription
+            return (false, "")
         }
     }
-    
-    // MARK: - Face ID Logic
-    func authenticateWithFaceID(completion: @escaping (Bool, String) -> Void) {
-        let context = LAContext()
-        var error: NSError?
-        
-        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            let reason = "Log in to your Polmure account."
-            
-            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
-                DispatchQueue.main.async {
-                    if success {
-                        completion(true, "")
-                    } else {
-                        completion(false, "Face ID failed or was canceled.")
-                    }
-                }
+
+    // MARK: - Forgot Password
+    func sendPasswordReset(email: String, completion: @escaping (Bool, String) -> Void) {
+        let safeEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !safeEmail.isEmpty else {
+            completion(false, "Please enter your email address.")
+            return
+        }
+        Task {
+            do {
+                try await Auth.auth().sendPasswordReset(withEmail: safeEmail)
+                completion(true, "")
+            } catch {
+                completion(false, error.localizedDescription)
             }
-        } else {
-            completion(false, "Face ID is not available on this device.")
         }
     }
 }

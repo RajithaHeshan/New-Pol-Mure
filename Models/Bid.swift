@@ -1,32 +1,35 @@
-// Location: New-Pol-Mure/Models/Bid.swift
+
 
 import Foundation
 import FirebaseFirestore
 
 struct Bid: Identifiable {
-    let id: String              // Firestore document ID
-    let sellerID: String        // Seller's user document ID (links to HarvestLot.id)
-    let bidderID: String        // Buyer's user document ID
+    let id: String
+    let harvestID: String   
+    let sellerID: String    
+    let sellerName: String 
+    let bidderID: String
     let bidderName: String
     let amount: Double
     let placedAt: Date
+    let status: String      // "pending" | "accepted" | "declined"
 
-    init?(id: String, data: [String: Any]) {
+    init?(id: String, data: [String: Any]) {  //requiremnt missing data incompleted skiped 
         guard
-            let sellerID = data["sellerID"] as? String,
-            let bidderID = data["bidderID"] as? String,
+            let bidderID   = data["bidderID"]   as? String,
             let bidderName = data["bidderName"] as? String,
-            let amount = data["amount"] as? Double,
-            let placedAt = (data["placedAt"] as? Timestamp)?.dateValue()
+            let amount     = data["amount"]     as? Double,
+            let placedAt   = (data["placedAt"]  as? Timestamp)?.dateValue()
         else { return nil }
 
-        self.id = id
-        self.sellerID = sellerID
-        self.bidderID = bidderID
+        self.id         = id
+        self.harvestID  = data["harvestID"]  as? String ?? ""
+        self.sellerID   = data["sellerID"]   as? String ?? ""
+        self.sellerName = data["sellerName"] as? String ?? ""
+        self.bidderID   = bidderID
         self.bidderName = bidderName
-        self.amount = amount
-        self.placedAt = placedAt
+        self.amount     = amount
+        self.placedAt   = placedAt
+        self.status     = data["status"] as? String ?? "pending"
     }
 }
-
-

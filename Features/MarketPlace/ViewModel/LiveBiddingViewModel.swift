@@ -1,14 +1,11 @@
-
 import SwiftUI
-import FirebaseAuth
 import FirebaseFirestore
 import UserNotifications
 
-
-private final class ListenerBox {
-    var listener: ListenerRegistration?
+private final class ListenerBox {   
+    var listener: ListenerRegistration? //handle realtime data
     init() {}
-    deinit { listener?.remove() }
+    deinit { listener?.remove() } // prevent memory leaked
 }
 
 @Observable
@@ -17,32 +14,25 @@ class LiveBiddingViewModel {
 
     let lot: HarvestLot
 
-   
     var userBidInput: String = ""
     var currentHighestBid: Double
     var currentHighestBidderID: String = ""
     var isOutbid: Bool = false
     var isPlacingBid: Bool = false
 
-   
     private let currentBuyerID: String
     private var currentBuyerName: String = ""
-
-   
     private let listenerBox = ListenerBox()
-
- 
     private var isFirstSnapshot: Bool = true
 
     init(lot: HarvestLot) {
         self.lot = lot
         self.currentHighestBid = lot.currentBid
-        self.currentBuyerID = Auth.auth().currentUser?.uid ?? ""
+        self.currentBuyerID = AuthManager.shared.currentUserID
         fetchBuyerName()
         attachBidsListener()
     }
 
-    // MARK: - Fetch Buyer Name from Firestore (fullName saved during registration)
     private func fetchBuyerName() {
         guard !currentBuyerID.isEmpty else { return }
         Task {
@@ -56,13 +46,11 @@ class LiveBiddingViewModel {
         }
     }
 
-    // MARK: - Real-Time Bid Listener
-    // No .order(by:) — avoids Firestore composite index requirement.
-    // Sorting is done in Swift after receiving all bids for this seller.
+
     private func attachBidsListener() {
         listenerBox.listener = Firestore.firestore()
             .collection("bids")
-            .whereField("sellerID", isEqualTo: lot.id)
+            .whereField("harvestID", isEqualTo: lot.id) // filter only bids only this harvest. all the bid share with other buyres
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -71,20 +59,25 @@ class LiveBiddingViewModel {
                     return
                 }
 
+
+                //get all the dids sort in descending order
                 let allBids = snapshot?.documents.compactMap {
                     Bid(id: $0.documentID, data: $0.data())
                 } ?? []
+
+                //take top one
 
                 guard let topBid = allBids.sorted(by: { $0.amount > $1.amount }).first else {
                     self.isFirstSnapshot = false
                     return
                 }
 
-                // First fire — just sync state, never alert
-                if self.isFirstSnapshot {
+
+
+                if self.isFirstSnapshot {  //initial login prevnt existing bids
                     self.currentHighestBid = topBid.amount
                     self.currentHighestBidderID = topBid.bidderID
-                    self.isFirstSnapshot = false
+                    self.isFirstSnapshot = false //login initially no outbid notifcation 
                     return
                 }
 
@@ -92,28 +85,29 @@ class LiveBiddingViewModel {
                 self.currentHighestBid = topBid.amount
                 self.currentHighestBidderID = topBid.bidderID
 
-                // Outbid: someone else is now leading AND current buyer was leading before
-                if topBid.bidderID != self.currentBuyerID && previousLeaderID == self.currentBuyerID {
-                    self.isOutbid = true
-                    self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName)
+                if topBid.bidderID == self.currentBuyerID {
+                    self.isOutbid = false  //leader no warring 
+                    return
                 }
 
-                // Current buyer re-took the lead — clear outbid state
-                if topBid.bidderID == self.currentBuyerID {
-                    self.isOutbid = false
+                let currentBuyerHasBid = allBids.contains { $0.bidderID == self.currentBuyerID } // current buyer inlcude one than bid
+                if currentBuyerHasBid && topBid.bidderID != previousLeaderID && !self.isOutbid {
+                    self.isOutbid = true
+                    self.scheduleOutbidNotification(newAmount: topBid.amount, bidderName: topBid.bidderName) //push notofication 
                 }
             }
     }
 
-    // MARK: - Bid Actions
+
+
     func incrementBid(by amount: Double) {
-        let currentInput = Double(userBidInput) ?? currentHighestBid
+        let currentInput = Double(userBidInput) ?? currentHighestBid  //if textfiedl empty use current higherbid
         userBidInput = String(format: "%.0f", currentInput + amount)
     }
 
     func decrementBid() {
         let currentInput = Double(userBidInput) ?? currentHighestBid
-        if currentInput > currentHighestBid + 1 {
+        if currentInput > currentHighestBid + 1 { // than current higherbid
             userBidInput = String(format: "%.0f", currentInput - 1)
         }
     }
@@ -125,14 +119,18 @@ class LiveBiddingViewModel {
         Task {
             do {
                 let bidData: [String: Any] = [
-                    "sellerID": lot.id,
-                    "bidderID": currentBuyerID,
+                    "harvestID":  lot.id,
+                    "sellerID":   lot.sellerID,
+                    "sellerName": lot.sellerInitial,
+                    "bidderID":   currentBuyerID,
                     "bidderName": currentBuyerName,
-                    "amount": newBid,
-                    "placedAt": Timestamp()
+                    "amount":     newBid,
+                    "status":     "pending",
+                    "placedAt":   Timestamp()
                 ]
                 try await Firestore.firestore().collection("bids").addDocument(data: bidData)
                 userBidInput = ""
+                scheduleNewBidNotification(amount: newBid)
             } catch {
                 print("Error placing bid: \(error.localizedDescription)")
             }
@@ -140,45 +138,58 @@ class LiveBiddingViewModel {
         }
     }
 
-    // MARK: - Local Push Notification (Outbid Alert)
-    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
-        let sellerName = lot.sellerInitial
-        let lotID = lot.id
-
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            guard settings.authorizationStatus == .authorized else {
-                print("Notifications not authorized — status: \(settings.authorizationStatus.rawValue)")
-                return
-            }
-
-            let content = UNMutableNotificationContent()
-            content.title = "You've Been Outbid!"
-            content.body = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
-            content.sound = .default
-
-            let request = UNNotificationRequest(
-                identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)",
-                content: content,
-                trigger: nil
-            )
-            UNUserNotificationCenter.current().add(request) { error in
-                if let error {
-                    print("Notification error: \(error.localizedDescription)")
-                } else {
-                    print("Outbid notification scheduled successfully for \(bidderName)")
-                }
-            }
-        }
-
-        UINotificationFeedbackGenerator().notificationOccurred(.warning)
-    }
-
-    // MARK: - Debug / Simulation
     func simulateOutbid() {
         let simulatedAmount = currentHighestBid + 5.0
         currentHighestBid = simulatedAmount
         currentHighestBidderID = "simulated-other-buyer"
         isOutbid = true
         scheduleOutbidNotification(newAmount: simulatedAmount, bidderName: "Test Buyer")
+    }
+
+    private func scheduleNewBidNotification(amount: Double) {
+        let lotID = lot.id
+        let title = "New Bid Received!"
+        let body  = "\(self.currentBuyerName) placed Rs \(String(format: "%.0f", amount)) on your lot. Review it in Activity → Direct Bids."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: "bid")
+        }
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body  = body
+            content.sound = .default
+            let request = UNNotificationRequest(identifier: "newbid-\(lotID)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("New bid notification error: \(error.localizedDescription)") }
+            }
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
+    private func scheduleOutbidNotification(newAmount: Double, bidderName: String) {
+        let sellerName = lot.sellerInitial
+        let lotID = lot.id
+        let title = "You've Been Outbid!"
+        let body  = "\(bidderName) placed Rs \(String(format: "%.0f", newAmount)) on \(sellerName)'s lot. Bid higher to stay in."
+
+        Task { @MainActor in
+            NotificationStore.shared.add(ownerID: currentBuyerID, title: title, body: body, type: "outbid")
+        }
+
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body  = body
+            content.sound = .default
+            let request = UNNotificationRequest(identifier: "outbid-\(lotID)-\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error { print("Notification error: \(error.localizedDescription)") }
+            }
+        }
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
 }

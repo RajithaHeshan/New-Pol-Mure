@@ -1,30 +1,30 @@
-// Location: New-Pol-Mure/Features/MarketPlace/Views/LiveOfferView.swift
-
 import SwiftUI
 import MapKit
 
 struct LiveOfferView: View {
     @State private var viewModel: LiveOfferViewModel
     @FocusState private var isInputFocused: Bool
-    
-    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0) {
-        self._viewModel = State(initialValue: LiveOfferViewModel(buyer: buyer, currentMarketPrice: currentMarketPrice))
+
+    init(buyer: RegisteredBuyer, currentMarketPrice: Double = 120.0, isUrgentPitch: Bool = false) {
+        self._viewModel = State(initialValue: LiveOfferViewModel(buyer: buyer, currentMarketPrice: currentMarketPrice, isUrgentPitch: isUrgentPitch))
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                
                 OfferMapHeader(coordinate: viewModel.buyer.coordinate)
-                
+
                 VStack(alignment: .leading, spacing: 24) {
-                    
                     BuyerDetailSection(buyer: viewModel.buyer)
-                    
+
                     Divider()
-                    
-                    // NEW NAVIGATION: Safe placeholder to prevent build errors
-                    NavigationLink(destination: Text("Analytics Dashboard Coming Soon").navigationTitle("Analytics")) {
+
+                    NavigationLink(destination: MarketAnalyticsView(
+                        preselectedZone: CoconutZone.zone(
+                            for: viewModel.buyer.coordinate.latitude,
+                            lng: viewModel.buyer.coordinate.longitude
+                        )
+                    )) {
                         HStack {
                             Image(systemName: "chart.xyaxis.line")
                             Text("Check Market Prices Before Pitching")
@@ -37,11 +37,8 @@ struct LiveOfferView: View {
                         .background(Color.orange.opacity(0.1))
                         .cornerRadius(12)
                     }
-                    
+
                     OfferTerminal(viewModel: viewModel, isInputFocused: _isInputFocused)
-                    
-                    PresentationDebugToolsOffer(viewModel: viewModel)
-                    
                 }
                 .padding(20)
             }
@@ -54,12 +51,10 @@ struct LiveOfferView: View {
     }
 }
 
-// MARK: - Reusable Subviews
-
 struct OfferMapHeader: View {
     let coordinate: CLLocationCoordinate2D
     @State private var cameraPosition: MapCameraPosition
-    
+
     init(coordinate: CLLocationCoordinate2D) {
         self.coordinate = coordinate
         let customCamera = MapCamera(
@@ -70,32 +65,31 @@ struct OfferMapHeader: View {
         )
         self._cameraPosition = State(initialValue: .camera(customCamera))
     }
-    
+
     var body: some View {
         Map(position: $cameraPosition, interactionModes: []) {
             MapPolygon(coordinates: createCylinderBase(center: coordinate, radiusMeters: 2500))
                 .foregroundStyle(.orange.opacity(0.3))
-            
             Marker("Buyer Location", coordinate: coordinate)
                 .tint(.orange)
         }
         .frame(height: 220)
         .mask(LinearGradient(gradient: Gradient(colors: [.black, .black, .black, .clear]), startPoint: .top, endPoint: .bottom))
     }
-    
+
     private func createCylinderBase(center: CLLocationCoordinate2D, radiusMeters: Double) -> [CLLocationCoordinate2D] {
         let earthRadius = 6378100.0
         let lat = center.latitude * .pi / 180.0
         let lon = center.longitude * .pi / 180.0
-        
         var points: [CLLocationCoordinate2D] = []
         for i in 0..<36 {
             let angle = Double(i) * 10.0 * .pi / 180.0
             let dLat = (radiusMeters * cos(angle)) / earthRadius
             let dLon = (radiusMeters * sin(angle)) / (earthRadius * cos(lat))
-            
-            points.append(CLLocationCoordinate2D(latitude: (lat + dLat) * 180.0 / .pi,
-                                                 longitude: (lon + dLon) * 180.0 / .pi))
+            points.append(CLLocationCoordinate2D(
+                latitude: (lat + dLat) * 180.0 / .pi,
+                longitude: (lon + dLon) * 180.0 / .pi
+            ))
         }
         return points
     }
@@ -103,7 +97,7 @@ struct OfferMapHeader: View {
 
 struct BuyerDetailSection: View {
     let buyer: RegisteredBuyer
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -111,7 +105,7 @@ struct BuyerDetailSection: View {
                     .resizable()
                     .frame(width: 50, height: 50)
                     .foregroundColor(.gray.opacity(0.5))
-                
+
                 VStack(alignment: .leading) {
                     HStack {
                         Text(buyer.name)
@@ -131,11 +125,11 @@ struct BuyerDetailSection: View {
                     }
                 }
             }
-            
+
             Text("Needs \(buyer.typicalVolume)")
                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                 .padding(.top, 8)
-            
+
             HStack {
                 Image(systemName: "hand.raised.fill")
                     .foregroundColor(.orange)
@@ -152,27 +146,24 @@ struct BuyerDetailSection: View {
 struct OfferTerminal: View {
     @Bindable var viewModel: LiveOfferViewModel
     @FocusState var isInputFocused: Bool
-    
+
     var body: some View {
         VStack(spacing: 20) {
-            
-            // Live Status Card
             VStack(spacing: 8) {
-                Text(viewModel.isUnderbid ? "WARNING: CHEAPER OFFER SUBMITTED!" : "CURRENT LOWEST PITCH")
+                Text(viewModel.isOutpitched ? "WARNING: HIGHER OFFER SUBMITTED!" : "CURRENT HIGHEST PITCH")
                     .font(.caption.bold())
-                    .foregroundColor(viewModel.isUnderbid ? .red : .secondary)
-                
-                Text("Rs \(viewModel.currentLowestOffer, specifier: "%.2f")")
+                    .foregroundColor(viewModel.isOutpitched ? .red : .secondary)
+
+                Text("Rs \(viewModel.currentHighestOffer, specifier: "%.2f")")
                     .font(.system(size: 40, weight: .bold, design: .monospaced))
-                    .foregroundColor(viewModel.isUnderbid ? .red : .green)
+                    .foregroundColor(viewModel.isOutpitched ? .red : .green)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 24)
-            .background(viewModel.isUnderbid ? Color.red.opacity(0.1) : Color.green.opacity(0.05))
+            .background(viewModel.isOutpitched ? Color.red.opacity(0.1) : Color.green.opacity(0.05))
             .cornerRadius(16)
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isUnderbid)
-            
-            // Stepper & Input Area
+            .animation(.easeInOut(duration: 0.3), value: viewModel.isOutpitched)
+
             HStack(spacing: 12) {
                 Button(action: { viewModel.decrementOffer() }) {
                     Image(systemName: "minus")
@@ -182,12 +173,11 @@ struct OfferTerminal: View {
                         .foregroundColor(.primary)
                         .cornerRadius(12)
                 }
-                
+
                 HStack {
                     Text("Rs")
                         .font(.title2.bold())
                         .foregroundColor(.secondary)
-                    
                     TextField("Offer", text: $viewModel.userOfferInput)
                         .keyboardType(.decimalPad)
                         .focused($isInputFocused)
@@ -197,7 +187,7 @@ struct OfferTerminal: View {
                 .padding()
                 .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(12)
-                
+
                 Button(action: { viewModel.incrementOffer(by: 1) }) {
                     Image(systemName: "plus")
                         .font(.title2.bold())
@@ -207,7 +197,7 @@ struct OfferTerminal: View {
                         .cornerRadius(12)
                 }
             }
-            
+
             HStack(spacing: 12) {
                 ForEach([1, 5, 10], id: \.self) { amount in
                     Button(action: { viewModel.decrementOffer(bySpecificAmount: Double(amount)) }) {
@@ -221,54 +211,42 @@ struct OfferTerminal: View {
                     }
                 }
             }
-            
-            // Action Button
+
             Button(action: {
-                if viewModel.sendPitch() {
-                    isInputFocused = false
-                }
+                viewModel.sendPitch()
+                isInputFocused = false
             }) {
-                Text("Send Pitch")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.orange)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                Group {
+                    if viewModel.isPlacingOffer {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("Send Pitch")
+                            .font(.headline)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.orange)
+                .foregroundColor(.white)
+                .cornerRadius(12)
             }
+            .disabled(viewModel.isPlacingOffer)
         }
     }
 }
 
-struct PresentationDebugToolsOffer: View {
-    @Bindable var viewModel: LiveOfferViewModel
-    
-    var body: some View {
-        Button(action: {
-            viewModel.simulateCheaperOffer()
-        }) {
-            Text("🔧 Simulate Competitor Cheaper Offer")
-                .font(.caption.bold())
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
-        }
-        .padding(.top, 40)
-    }
-}
 
 #Preview {
     NavigationStack {
         LiveOfferView(buyer: RegisteredBuyer(
-            id: UUID().uuidString, // FIXED: Added missing 'id' argument
+            id: UUID().uuidString,
             name: "Nimal's Bakery",
             locationName: "Kaduwela Center",
             coordinate: CLLocationCoordinate2D(latitude: 6.9333, longitude: 79.9833),
             typicalVolume: "5K - 10K Nuts",
-            // FIXED: Removed the extra 'volumeCapacity' argument
+            businessType: "Bakery / Restaurant",
             rating: 4.7,
+            ratingCount: 12,
             isUrgent: true
         ))
     }

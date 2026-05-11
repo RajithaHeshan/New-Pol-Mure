@@ -1,0 +1,226 @@
+import SwiftUI
+import Charts
+
+struct BuyerPerformanceView: View {
+    @State private var viewModel = BuyerPerformanceViewModel()
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+
+                // MARK: - Timeframe Picker
+                Picker("Timeframe", selection: $viewModel.selectedTimeframe) {
+                    ForEach(viewModel.timeframes, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal)
+                .onChange(of: viewModel.selectedTimeframe) { _, _ in
+                    viewModel.onTimeframeChanged()
+                }
+
+                // MARK: - Period Label
+                Text(periodDescription(for: viewModel.selectedTimeframe))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal)
+
+                // MARK: - KPI Cards
+                VStack(spacing: 16) {
+                    HStack {
+                        BuyerKPICard(
+                            title: "Total Volume",
+                            value: viewModel.totalVolumeNuts > 0 ? "\(viewModel.totalVolumeNuts)" : "—",
+                            subtitle: "Nuts Acquired",
+                            icon: "shippingbox.fill",
+                            color: .blue
+                        )
+                        BuyerKPICard(
+                            title: "Win Rate",
+                            value: viewModel.winRate > 0 ? "\(viewModel.winRate)%" : "—",
+                            subtitle: "Bids Won",
+                            icon: "trophy.fill",
+                            color: .green
+                        )
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Total Spend (\(viewModel.selectedTimeframe))")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        if viewModel.isLoading {
+                            ProgressView().padding(.vertical, 8)
+                        } else {
+                            Text(viewModel.totalSpend > 0 ? "Rs \(viewModel.totalSpend, specifier: "%.0f")" : "Rs 0")
+                                .font(.system(size: 36, weight: .heavy, design: .rounded))
+                                .foregroundColor(viewModel.totalSpend > 0 ? .primary : .secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color(UIColor.secondarySystemGroupedBackground))
+                    .cornerRadius(16)
+                }
+                .padding(.horizontal)
+
+                // MARK: - Spend Chart
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text("Detailed Expenditure")
+                            .font(.title3.bold())
+                        Spacer()
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Circle().fill(Color.blue).frame(width: 8, height: 8)
+                                Text("Bids").font(.caption).foregroundColor(.secondary)
+                            }
+                            HStack(spacing: 4) {
+                                Circle().fill(Color.blue.opacity(0.5)).frame(width: 8, height: 8)
+                                Text("Offers").font(.caption).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity).frame(height: 250)
+                            .padding()
+                            .background(Color(UIColor.secondarySystemGroupedBackground))
+                            .cornerRadius(16)
+                            .padding(.horizontal)
+                    } else if viewModel.hasNoSpendData {
+                        VStack(spacing: 8) {
+                            Image(systemName: "chart.bar")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                            Text("No spend data for this period.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 250)
+                        .padding()
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
+                    } else {
+                        Chart(viewModel.detailedSpendData) { data in
+                            BarMark(
+                                x: .value("Period", data.period),
+                                y: .value("Amount (Rs)", data.amount)
+                            )
+                            .foregroundStyle(by: .value("Spend Source", data.source))
+                            .cornerRadius(6)
+                        }
+                        .chartForegroundStyleScale([
+                            "Bids Won":        Color.blue,
+                            "Accepted Offers": Color.blue.opacity(0.5)
+                        ])
+                        .frame(height: 250)
+                        .padding()
+                        .background(Color(UIColor.secondarySystemGroupedBackground))
+                        .cornerRadius(16)
+                        .padding(.horizontal)
+                    }
+                }
+
+                // MARK: - Personal Insights
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Personal Insights")
+                        .font(.title3.bold())
+                        .padding(.horizontal)
+
+                    VStack(spacing: 12) {
+                        BuyerInsightRow(icon: "arrow.down.right.circle.fill", color: .green,  title: "Sourcing Cost",   desc: viewModel.insightSourcingDesc)
+                        BuyerInsightRow(icon: "exclamationmark.triangle.fill", color: .orange, title: "Bid Success",     desc: viewModel.insightBidSuccessDesc)
+                        BuyerInsightRow(icon: "lightbulb.fill",                color: .yellow, title: "Offer Reliance",  desc: viewModel.insightOfferRelianceDesc)
+                    }
+                    .padding(.horizontal)
+                }
+            }
+            .padding(.vertical)
+        }
+        .background(Color(UIColor.systemGroupedBackground))
+        .navigationTitle("My Performance")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func periodDescription(for timeframe: String) -> String {
+        let calendar = Calendar.current
+        let now = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy"
+
+        switch timeframe {
+        case "Week":
+            let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: now)) ?? now
+            return "\(formatter.string(from: start)) – \(formatter.string(from: now))"
+        case "Year":
+            let start = calendar.date(byAdding: .month, value: -11,
+                to: calendar.date(from: calendar.dateComponents([.year, .month], from: now))!) ?? now
+            return "\(formatter.string(from: start)) – \(formatter.string(from: now))"
+        default:
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "MMMM yyyy"
+            return monthFormatter.string(from: now)
+        }
+    }
+}
+
+struct BuyerKPICard: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .padding(8)
+                    .background(color.opacity(0.15))
+                    .clipShape(Circle())
+                Spacer()
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.caption).foregroundColor(.secondary)
+                Text(value).font(.title2.bold())
+                Text(subtitle).font(.caption2).foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(16)
+    }
+}
+
+struct BuyerInsightRow: View {
+    let icon: String
+    let color: Color
+    let title: String
+    let desc: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: icon).font(.title2).foregroundColor(color)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.subheadline.bold())
+                Text(desc)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .cornerRadius(12)
+    }
+}
+
+#Preview {
+    NavigationStack { BuyerPerformanceView() }
+}
