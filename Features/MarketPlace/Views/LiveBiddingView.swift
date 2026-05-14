@@ -46,7 +46,7 @@ struct LiveBiddingView: View {
 
                     BiddingTerminal(viewModel: viewModel, isInputFocused: _isInputFocused)
 
-                    PresentationDebugTools(viewModel: viewModel)
+
                 }
                 .padding(20)
             }
@@ -263,23 +263,6 @@ struct BiddingTerminal: View {
     }
 }
 
-// MARK: - Presentation Debug Tools
-struct PresentationDebugTools: View {
-    @Bindable var viewModel: LiveBiddingViewModel
-
-    var body: some View {
-        Button(action: { viewModel.simulateOutbid() }) {
-            Text("🔧 Simulate WebSocket Outbid Event")
-                .font(.caption.bold())
-                .foregroundColor(.red)
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
-        }
-        .padding(.top, 40)
-    }
-}
 
 
 

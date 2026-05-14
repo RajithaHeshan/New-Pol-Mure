@@ -128,14 +128,15 @@ class ActivityDashboardViewModel {
         return bids.map { bid in
             guard bid.sellerName.isEmpty, let resolvedName = nameMap[bid.sellerID] else { return bid }
             return Bid(id: bid.id, data: [
-                "sellerID":   bid.sellerID,
-                "sellerName": resolvedName,
-                "bidderID":   bid.bidderID,
-                "bidderName": bid.bidderName,
-                "harvestID":  bid.harvestID,
-                "amount":     bid.amount,
-                "status":     bid.status,
-                "placedAt":   Timestamp(date: bid.placedAt)
+                "sellerID":    bid.sellerID,
+                "sellerName":  resolvedName,
+                "bidderID":    bid.bidderID,
+                "bidderName":  bid.bidderName,
+                "harvestID":   bid.harvestID,
+                "amount":      bid.amount,
+                "status":      bid.status,
+                "wasAccepted": bid.wasAccepted,
+                "placedAt":    Timestamp(date: bid.placedAt)
             ]) ?? bid
         }
     }
@@ -213,7 +214,7 @@ class ActivityDashboardViewModel {
             do {
 
                 try await db.collection("offers").document(offer.id)
-                    .updateData(["status": "accepted"])
+                    .updateData(["status": "accepted", "wasAccepted": true])
 
 
                 let buyerDoc   = try? await db.collection("users").document(currentBuyerID).getDocument()

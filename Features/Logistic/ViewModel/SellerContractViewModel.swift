@@ -33,20 +33,20 @@ class SellerContractViewModel {
     let amount:      Double
     var inspectionDate:    Date = Date().addingTimeInterval(86400)
 
-    // MARK: - Seller's own estate info (fetched from Firestore profile)
+    
     var sellerCoordinate:   CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
     var sellerLocationName: String = ""
 
-    // MARK: - Buyer profile info (fetched from Firestore)
+   
     var buyerVolume: String = ""
 
-    // MARK: - Action States
+   
     var isConfirmingHandover = false
     var isCancellingContract = false
-    var hasVerifiedQuality   = false   // seller must tap Verify Quality before handover unlocks
-    var hasReviewedDispute   = false   // seller must tap Review Dispute before accept/cancel unlock
+    var hasVerifiedQuality   = false   
+    var hasReviewedDispute   = false   
 
-    // MARK: - Rating
+ 
     var showRatingSheet  = false
     var sellerDisplayName: String = ""
 
@@ -62,7 +62,7 @@ class SellerContractViewModel {
         self.amount      = contract.amount
         self.originalPrice = contract.amount
 
-        // Map Firestore status string → SellerContractState FSM
+      
         switch contract.status {
         case "escrow":          self.currentState = .escrowSecured
         case "fundsLocked":     self.currentState = .escrowSecured
@@ -74,7 +74,6 @@ class SellerContractViewModel {
         default:                self.currentState = .escrowSecured
         }
 
-        // Seed inspectionDate from contract if buyer already revealed location
         if let savedDate = contract.inspectionDate {
             self.inspectionDate = savedDate
         }
@@ -90,7 +89,7 @@ class SellerContractViewModel {
         }
     }
 
-    // MARK: - Fetch Seller's Own Estate Profile for Calendar event location
+    
     private func fetchSellerCoordinate(sellerID: String) {
         guard !sellerID.isEmpty else { return }
         Task {
@@ -109,7 +108,7 @@ class SellerContractViewModel {
         }
     }
 
-    // MARK: - Fetch Buyer's Typical Volume
+   
     private func fetchBuyerVolume(buyerID: String) {
         guard !buyerID.isEmpty else { return }
         Task {
@@ -124,7 +123,7 @@ class SellerContractViewModel {
         }
     }
 
-    // MARK: - Live Listener: contract status + inspectionDate changes
+  
     private func attachContractListener() {
         contractListenerBox.listener = Firestore.firestore()
             .collection("contracts")
@@ -151,7 +150,7 @@ class SellerContractViewModel {
                     }
                 }
 
-                // Sync inspection date written by buyer when revealing exact location
+               
                 if let ts = data["inspectionDate"] as? Timestamp {
                     self.inspectionDate = ts.dateValue()
                 }
@@ -159,7 +158,7 @@ class SellerContractViewModel {
     }
 
     
-    private func attachDisputeListener() {
+      private func attachDisputeListener() {
         disputeListenerBox.listener = Firestore.firestore()
             .collection("disputes")
             .whereField("contractID", isEqualTo: contractID)
@@ -172,7 +171,7 @@ class SellerContractViewModel {
                     return
                 }
 
-                // Pick the most recent pending dispute without requiring a composite index
+               
                 let doc = snapshot?.documents.max {
                     let a = ($0.data()["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
                     let b = ($1.data()["createdAt"] as? Timestamp)?.dateValue() ?? .distantPast
@@ -205,11 +204,11 @@ class SellerContractViewModel {
             do {
                 let db = Firestore.firestore()
 
-                // Update contract amount to the counter-offer
+             
                 try await db.collection("contracts").document(contractID)
                     .updateData(["amount": counterOffer])
 
-                // Mark all pending disputes on this contract as resolved
+               
                 let disputes = try await db.collection("disputes")
                     .whereField("contractID", isEqualTo: contractID)
                     .whereField("status", isEqualTo: "pending")
@@ -219,7 +218,7 @@ class SellerContractViewModel {
                     try await doc.reference.updateData(["status": "resolved"])
                 }
 
-                // Restore contract status to inspection so logistics continue
+               
                 try await db.collection("contracts").document(contractID)
                     .updateData(["status": "inspection"])
 
@@ -229,6 +228,7 @@ class SellerContractViewModel {
             }
         }
     }
+
 
  
     func cancelContract() {
@@ -280,8 +280,6 @@ class SellerContractViewModel {
 
 
 
-
-    // MARK: - Fetch seller's display name for the rating sheet reviewer label
     private func fetchSellerDisplayName(sellerID: String) {
         Task {
             let doc = try? await Firestore.firestore()
@@ -292,7 +290,7 @@ class SellerContractViewModel {
         }
     }
 
-    // MARK: - Check if seller already rated this contract
+   
     private func checkIfAlreadyRated(sellerID: String) {
         Task {
             let snapshot = try? await Firestore.firestore()

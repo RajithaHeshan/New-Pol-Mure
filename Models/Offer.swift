@@ -13,6 +13,7 @@ struct Offer: Identifiable {
     let placedAt: Date
     let status: String          // "pending" | "accepted" | "declined"
     let isUrgentPitch: Bool
+    let wasAccepted: Bool       // true once buyer accepted — survives Cloud Function status overwrites
 
     init?(id: String, data: [String: Any]) {
         guard
@@ -32,5 +33,6 @@ struct Offer: Identifiable {
         self.placedAt       = placedAt
         self.status         = data["status"]        as? String ?? "pending"
         self.isUrgentPitch  = data["isUrgentPitch"] as? Bool   ?? false
+        self.wasAccepted    = data["wasAccepted"]   as? Bool   ?? false
     }
 }

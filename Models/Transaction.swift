@@ -19,7 +19,7 @@ struct Transaction: Identifiable {
     let source: String  // "bid" or "offer" — set at transaction creation time
     let isUrgent: Bool  // true when transaction originated from an urgent post pitch
 
-    var netAmount: Double { isCredit ? amount - transactionFee : amount - transactionFee }
+    var netAmount: Double { isCredit ? amount - transactionFee : amount + transactionFee }
 
     init?(id: String, data: [String: Any]) {
         guard

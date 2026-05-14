@@ -27,12 +27,6 @@ struct ActiveContractView: View {
 
                     
                     if viewModel.isLocationRevealed {
-                        WeatherForecastCard(locationName: "Estate Area", date: viewModel.inspectionDate, themeColor: .blue)
-                            .padding(.horizontal)
-                    }
-
-                   
-                    if viewModel.isLocationRevealed {
                         calendarSchedulingCard
                             .padding(.horizontal)
                     }
@@ -79,9 +73,6 @@ struct ActiveContractView: View {
         }
     }
 
-
-    //after reveal location tap calender event create
-    
     private var calendarSchedulingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -109,7 +100,7 @@ struct ActiveContractView: View {
             }
             .buttonStyle(.plain)
 
-            Button(action: {
+            Button(action: {   //add to calneder
                 let fireDate = viewModel.inspectionDate.addingTimeInterval(viewModel.selectedReminderOffset)
                 print("📲 Add to Calendar tapped — inspectionDate: \(viewModel.inspectionDate), reminderOffset: \(viewModel.selectedReminderOffset)s, notificationFiresAt: \(fireDate), secondsUntilFire: \(fireDate.timeIntervalSinceNow)s")
                 calendarManager.addInspectionToCalendar(
@@ -167,29 +158,11 @@ struct ActiveContractView: View {
 
 
 
-struct WeatherForecastCard: View {
-    let locationName: String
-    let date: Date
-    let themeColor: Color
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "cloud.heavyrain.fill").font(.largeTitle).foregroundColor(themeColor)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Logistics Weather Alert").font(.subheadline.bold()).foregroundColor(themeColor)
-                Text("Heavy rain expected in \(locationName) during the scheduled inspection time. Drive carefully.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .background(themeColor.opacity(0.1))
-        .cornerRadius(16)
-    }
-}
 
 
-//map show exact location with location distance
+
+
+//state location to buyer location
 
 struct ContractMapHeader: View {
     let buyerCoordinate: CLLocationCoordinate2D
@@ -252,6 +225,8 @@ struct ContractMapHeader: View {
             if isRevealed { Task { await calculateRoute() } }
         }
     }
+
+    //distance 
 
     private func calculateRoute() async {
         isCalculatingRoute = true
@@ -482,7 +457,7 @@ struct ContextualActionArea: View {
                 }
 
             } else if viewModel.currentState == .inspectionPending {
-                Button(action: { viewModel.releaseFundsSimulation() }) {
+                Button(action: { viewModel.releaseFundsSimulation() }) {   //approve quality 
                     Label("Approve Quality & Release Funds", systemImage: "checkmark.seal.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
@@ -491,7 +466,7 @@ struct ContextualActionArea: View {
                         .foregroundColor(.white)
                         .cornerRadius(14)
                 }
-                Button(action: { viewModel.showDisputeModal = true }) {
+                Button(action: { viewModel.showDisputeModal = true }) {   //dispute
                     Text("Dispute / Renegotiate")
                         .font(.subheadline.bold())
                         .frame(maxWidth: .infinity)
@@ -509,7 +484,7 @@ struct ContextualActionArea: View {
                         Text("Quality Approved")
                             .font(.subheadline.bold())
                             .foregroundColor(.green)
-                        Text("Waiting for seller to confirm handover…")
+                        Text("Waiting for seller to confirm handover…") //waiting for handover 
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -540,7 +515,7 @@ struct ContextualActionArea: View {
                     .cornerRadius(12)
 
                     Button(action: { viewModel.showRatingSheet = true }) {
-                        Label("Rate \(viewModel.sellerName)", systemImage: "star.fill")
+                        Label("Rate \(viewModel.sellerName)", systemImage: "star.fill") //raing 
                             .font(.subheadline.bold())
                             .frame(maxWidth: .infinity)
                             .padding()
@@ -791,6 +766,7 @@ struct InspectionDatePickerSheet: View {
             }
         }
     }
+
 }
 
 #Preview {

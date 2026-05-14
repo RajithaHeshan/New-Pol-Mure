@@ -60,6 +60,7 @@ struct FilterChipsView: View {
 struct RecommendedSellerCard: View {
     let seller: SellerLocation
     let currentHighestBid: Double
+    var isBidLocked: Bool = false
 
     var body: some View {
         NavigationLink(value: seller) {
@@ -104,6 +105,15 @@ struct RecommendedSellerCard: View {
                             .clipShape(Capsule())
                     }
                     .padding(.top, 4)
+
+                    Text(isBidLocked ? "Bided" : "Bid Now")
+                        .font(.caption.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(isBidLocked ? Color.gray.opacity(0.3) : Color.blue)
+                        .foregroundColor(isBidLocked ? .secondary : .white)
+                        .clipShape(Capsule())
+                        .padding(.top, 4)
                 }
                 .padding(.top, 8)
             }
@@ -114,6 +124,8 @@ struct RecommendedSellerCard: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isBidLocked)
+        .allowsHitTesting(!isBidLocked)
     }
 }
 
@@ -123,6 +135,7 @@ struct RecommendedHarvestCard: View {
     let currentHighestBid: Double
     var sellerRating: Double = 0.0
     var sellerRatingCount: Int = 0
+    var isBidLocked: Bool = false
 
     var body: some View {
         NavigationLink(value: harvest.id) {
@@ -192,6 +205,15 @@ struct RecommendedHarvestCard: View {
                         .padding(.vertical, 3)
                         .background(Color.orange.opacity(0.1))
                         .clipShape(Capsule())
+
+                    Text(isBidLocked ? "Bided" : "Bid Now")
+                        .font(.caption.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(isBidLocked ? Color.gray.opacity(0.3) : Color.blue)
+                        .foregroundColor(isBidLocked ? .secondary : .white)
+                        .clipShape(Capsule())
+                        .padding(.top, 4)
                 }
                 .padding(.top, 8)
             }
@@ -202,6 +224,8 @@ struct RecommendedHarvestCard: View {
             .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isBidLocked)
+        .allowsHitTesting(!isBidLocked)
     }
 }
 
@@ -209,6 +233,7 @@ struct RecommendedHarvestCard: View {
 struct SellerRow: View {
     let seller: SellerLocation
     let currentHighestBid: Double
+    var isBidLocked: Bool = false
 
     var body: some View {
         NavigationLink(value: seller) {
@@ -239,12 +264,12 @@ struct SellerRow: View {
                         .font(.subheadline.bold())
                         .foregroundColor(.blue)
 
-                    Text("Bid Now")
+                    Text(isBidLocked ? "Bided" : "Bid Now")
                         .font(.caption.bold())
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Color.blue)
-                        .foregroundColor(.white)
+                        .background(isBidLocked ? Color.gray.opacity(0.3) : Color.blue)
+                        .foregroundColor(isBidLocked ? .secondary : .white)
                         .clipShape(Capsule())
                 }
             }
@@ -253,6 +278,8 @@ struct SellerRow: View {
             .cornerRadius(12)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isBidLocked)
+        .allowsHitTesting(!isBidLocked)
     }
 }
 
@@ -262,6 +289,7 @@ struct HarvestRowCard: View {
     let currentHighestBid: Double
     var sellerRating: Double = 0.0
     var sellerRatingCount: Int = 0
+    var isBidLocked: Bool = false
 
     var body: some View {
         HStack {
@@ -296,18 +324,19 @@ struct HarvestRowCard: View {
                 Text("Rs \(String(format: "%.0f", currentHighestBid))")
                     .font(.subheadline.bold())
                     .foregroundColor(.blue)
-                Text("Bid Now")
+                Text(isBidLocked ? "Bided" : "Bid Now")
                     .font(.caption.bold())
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .background(Color.blue)
-                    .foregroundColor(.white)
+                    .background(isBidLocked ? Color.gray.opacity(0.3) : Color.blue)
+                    .foregroundColor(isBidLocked ? .secondary : .white)
                     .clipShape(Capsule())
             }
         }
         .padding()
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(12)
+        .opacity(isBidLocked ? 0.75 : 1.0)
     }
 }
 

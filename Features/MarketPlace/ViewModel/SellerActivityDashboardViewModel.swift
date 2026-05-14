@@ -154,7 +154,6 @@ class SellerActivityDashboardViewModel {
         bidsListenerBox.listener = Firestore.firestore()
             .collection("bids")
             .whereField("sellerID", isEqualTo: currentSellerID)
-            .whereField("status", in: ["pending", "accepted"])
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self else { return }
 
@@ -164,11 +163,14 @@ class SellerActivityDashboardViewModel {
                     return
                 }
 
-                let updated = snapshot?.documents.compactMap {
+                let allDocs = snapshot?.documents ?? []
+                let updated = allDocs.compactMap {
                     Bid(id: $0.documentID, data: $0.data())
-                }.sorted { $0.placedAt > $1.placedAt } ?? []
+                }
+                .filter { $0.status == "pending" || $0.status == "accepted" || $0.wasAccepted }
+                .sorted { $0.placedAt > $1.placedAt }
 
-              
+
                 if !self.incomingBids.isEmpty {
                     let existingIDs = Set(self.incomingBids.map { $0.id })
                     for bid in updated where !existingIDs.contains(bid.id) && bid.status == "pending" {
@@ -195,9 +197,9 @@ class SellerActivityDashboardViewModel {
             // 1. Mark this bid accepted
             do {
                 try await db.collection("bids").document(bid.id)
-                    .updateData(["status": "accepted"])
+                    .updateData(["status": "accepted", "wasAccepted": true])
             } catch {
-                print("acceptBid failed: \(error.localizedDescription)")
+                print("❌ acceptBid failed: \(error.localizedDescription)")
                 return
             }
 
@@ -220,6 +222,7 @@ class SellerActivityDashboardViewModel {
             ]
 
             if !bid.harvestID.isEmpty {
+                contractData["harvestID"] = bid.harvestID
                 let harvestDoc = try? await db.collection("harvestLots").document(bid.harvestID).getDocument()
                 if let data = harvestDoc?.data() {
                     if let lat = data["latitude"]  as? Double,

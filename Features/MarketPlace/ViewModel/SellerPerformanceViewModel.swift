@@ -19,11 +19,10 @@ private let perfMonthFormatter: DateFormatter = {
 @MainActor
 class SellerPerformanceViewModel {
 
-    // MARK: - Timeframe Picker
+  
     var selectedTimeframe = "Month"
     let timeframes = ["Week", "Month", "Year"]
 
-    // MARK: - KPI Values (all timeframe-filtered)
     var nutsSold: Int         = 0
     var pitchSuccessRate: Int = 0
 
@@ -74,7 +73,7 @@ class SellerPerformanceViewModel {
         recompute()
     }
 
-    // MARK: - Rolling window start for the selected timeframe
+//selected time frame week/year
     private func windowStart(calendar: Calendar, now: Date) -> Date {
         switch selectedTimeframe {
         case "Week":  return calendar.date(byAdding: .day,   value: -6,  to: calendar.startOfDay(for: now)) ?? now
@@ -83,7 +82,7 @@ class SellerPerformanceViewModel {
         }
     }
 
-    // MARK: - Listeners
+   //attached transaction 
 
     private func attachTransactionsListener() {
         guard !currentSellerID.isEmpty else { return }
@@ -106,6 +105,8 @@ class SellerPerformanceViewModel {
                 self.isLoading = false
             }
     }
+
+
 
     private func attachOffersListener() {
         guard !currentSellerID.isEmpty else { return }

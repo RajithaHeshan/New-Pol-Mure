@@ -2,9 +2,9 @@ import SwiftUI
 import FirebaseFirestore
 import CoreLocation
 
-// MARK: - Zone Definition
+// area 
 struct CoconutZone: Identifiable, Hashable {
-    let id: String        // e.g. "kurunegala"
+    let id: String        
     let displayName: String
     let centerLat: Double
     let centerLng: Double
@@ -30,12 +30,21 @@ struct CoconutZone: Identifiable, Hashable {
         CoconutZone(id: "ratnapura",     displayName: "Ratnapura",      centerLat: 6.6828,  centerLng: 80.3992, radiusKM: 35),
     ]
 
-    // Returns the best-matching zone for a coordinate (first non-"all" match)
+    
     static func zone(for lat: Double, lng: Double) -> CoconutZone {
-        return allZones.first(where: { $0.id != "all" && $0.contains(lat: lat, lng: lng) })
+        let point = CLLocation(latitude: lat, longitude: lng)
+        return allZones
+            .filter { $0.id != "all" && $0.contains(lat: lat, lng: lng) }
+            .min(by: {
+                let a = CLLocation(latitude: $0.centerLat, longitude: $0.centerLng)
+                let b = CLLocation(latitude: $1.centerLat, longitude: $1.centerLng)
+                return a.distance(from: point) < b.distance(from: point)
+            })
             ?? allZones[0]
     }
 }
+
+
 
 private let dayFormatter: DateFormatter = {
     let f = DateFormatter()
@@ -43,14 +52,14 @@ private let dayFormatter: DateFormatter = {
     return f
 }()
 
-// "24 Apr" — shown on chart x-axis tick
+//  day show on chart 
 private let chartTickFormatter: DateFormatter = {
     let f = DateFormatter()
     f.dateFormat = "d MMM"
     return f
 }()
 
-// "24 Apr 2026" — shown in the date range label
+// date show in the chart 
 private let fullDateFormatter: DateFormatter = {
     let f = DateFormatter()
     f.dateFormat = "d MMM yyyy"
@@ -63,41 +72,48 @@ private final class AnalyticsListenerBox {
     deinit { listener?.remove() }
 }
 
+
+
 @Observable
 @MainActor
 class MarketAnalyticsViewModel {
 
-    // MARK: - Zone State
+   
     var selectedZone: CoconutZone = CoconutZone.allZones[0]
     let zones = CoconutZone.allZones
 
-    // MARK: - Chart Data
+
     var priceHistory: [PriceTrend] = []
 
-    // MARK: - Summary Stats
+  
     var currentMarketAverage: Double  = 0
     var weeklyChangePercent: Double   = 0
     var prevWeekAverage: Double       = 0   // previous 7-day avg — fed into PriceForecastEngine
     var weeklyTransactionCount: Int   = 0   // total bids+offers this week in selected zone
 
-    // MARK: - Date Range Label  e.g. "24 Apr 2026 – 30 Apr 2026"
+
+
+    
+    private var thisWeekTrueAverage: Double = 0
+
+    
     var chartDateRange: String = ""
 
-    // MARK: - 7-Day Price Forecast (CoreML)
+    
     var priceForecast: PriceForecast? = nil
 
-    // MARK: - Market Insight
+
     var marketInsight: String = "Analysing market trends…"
 
-    // MARK: - Loading State
+    // Loading State
     var isLoading = false
 
-    // Raw data cached for re-filtering without re-fetching
+   
     private var allBids: [Bid] = []
     private var allOffers: [Offer] = []
-    // sellerID → (lat, lng) from users collection
+   
     private var sellerLocations: [String: (lat: Double, lng: Double)] = [:]
-    // harvestID → (lat, lng) from harvestLots collection — overrides seller location for harvest bids
+    
     private var harvestLocations: [String: (lat: Double, lng: Double)] = [:]
 
     private let bidsListenerBox     = AnalyticsListenerBox()
@@ -117,7 +133,11 @@ class MarketAnalyticsViewModel {
         attachOffersListener()
     }
 
-    // MARK: - Auto-detect zone from logged-in user's registered location
+
+
+
+
+    // Auto-detect zone from logged-in user's registered location
     private func loadUserZone() {
         let userID = AuthManager.shared.currentUserID
         guard !userID.isEmpty else { return }
@@ -136,7 +156,11 @@ class MarketAnalyticsViewModel {
         }
     }
 
-    // MARK: - Sellers listener — keeps sellerID → (lat, lng) map live from users collection
+
+
+
+    // Sellers listener — keeps sellerID 
+
     private func attachSellersListener() {
         sellersListenerBox.listener = Firestore.firestore()
             .collection("users")
@@ -155,9 +179,9 @@ class MarketAnalyticsViewModel {
             }
     }
 
-    // MARK: - Harvest locations listener — keeps harvestID → (lat, lng) live from harvestLots collection
-    // This is critical: bids on Kandy1/Puthalama2 must use the harvest's own coordinates,
-    // not the seller's registered home location which may be in a different district.
+    
+
+
     private func attachHarvestLocationsListener() {
         harvestsListenerBox.listener = Firestore.firestore()
             .collection("harvestLots")
@@ -175,7 +199,7 @@ class MarketAnalyticsViewModel {
             }
     }
 
-    // MARK: - Bids listener — last 14 days (buyers bidding on harvest lots)
+    // Bids listener — last 14 days 
     private func attachBidsListener() {
         isLoading = true
         let fourteenDaysAgo = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
@@ -198,7 +222,9 @@ class MarketAnalyticsViewModel {
             }
     }
 
-    // MARK: - Offers listener — last 14 days (sellers pitching to registered buyers)
+
+
+    // MARK: - Offers listener — last 14 days 
     private func attachOffersListener() {
         let fourteenDaysAgo = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
 
@@ -218,9 +244,11 @@ class MarketAnalyticsViewModel {
             }
     }
 
-    // MARK: - Called whenever zone changes or new data arrives
+
+
+    //  Called whenever zone changes or new data arrives
     func recomputeTrend() {
-        // Merge bids and offers into unified (sellerID, amount, date) tuples
+        // Merge bids and offers 
         var pricePoints: [(sellerID: String, amount: Double, date: Date)] = []
 
         if selectedZone.id == "all" {
@@ -234,6 +262,8 @@ class MarketAnalyticsViewModel {
                 guard let loc, selectedZone.contains(lat: loc.lat, lng: loc.lng) else { return nil }
                 return (bid.sellerID, bid.amount, bid.placedAt)
             }
+
+
             pricePoints += allOffers.compactMap { offer in
                 guard let loc = sellerLocations[offer.sellerID],
                       selectedZone.contains(lat: loc.lat, lng: loc.lng) else { return nil }
@@ -244,7 +274,11 @@ class MarketAnalyticsViewModel {
         computeTrend(from: pricePoints)
     }
 
-    // MARK: - Compute 7-Day Trend from merged price points
+
+
+
+   // seven day price trend 7 days thrue avaerage
+
     private func computeTrend(from points: [(sellerID: String, amount: Double, date: Date)]) {
         let calendar = Calendar.current
         let today    = calendar.startOfDay(for: Date())
@@ -299,19 +333,25 @@ class MarketAnalyticsViewModel {
         let thisWeekAvg = thisWeekTotals.values.reduce((0.0, 0)) { ($0.0 + $1.sum, $0.1 + $1.count) }
         let prevWeekAvg = prevWeekTotals.values.reduce((0.0, 0)) { ($0.0 + $1.sum, $0.1 + $1.count) }
 
-        let prevAvg = prevWeekAvg.1 > 0 ? prevWeekAvg.0 / Double(prevWeekAvg.1) : 0
+        let prevAvg     = prevWeekAvg.1 > 0 ? prevWeekAvg.0 / Double(prevWeekAvg.1) : 0
+        let thisAvg     = thisWeekAvg.1 > 0 ? thisWeekAvg.0 / Double(thisWeekAvg.1) : 0
 
-        // Use currentMarketAverage (most recent day's price) for the change calculation
-        // so the insight text matches what the user sees at the top of the chart
-        weeklyChangePercent        = prevAvg > 0 ? ((currentMarketAverage - prevAvg) / prevAvg) * 100 : 0
-        prevWeekAverage            = prevAvg
-        weeklyTransactionCount     = thisWeekAvg.1
+        // UI shows spot price (today or most recent day) — insight text matches chart header
+        weeklyChangePercent    = prevAvg > 0 ? ((currentMarketAverage - prevAvg) / prevAvg) * 100 : 0
+        prevWeekAverage        = prevAvg
+        weeklyTransactionCount = thisWeekAvg.1
+        
+
+
+        thisWeekTrueAverage    = thisAvg > 0 ? thisAvg : currentMarketAverage
 
         updateInsight()
-        updateForecast()
+        updateForecast() //then next seven days
     }
 
-    // MARK: - Dynamic Insight
+
+
+   
     private func updateInsight() {
         let zoneName   = selectedZone.id == "all" ? "Sri Lanka" : selectedZone.displayName
         let priceStr   = String(format: "%.0f", currentMarketAverage)
@@ -340,22 +380,41 @@ class MarketAnalyticsViewModel {
         }
     }
 
-    // MARK: - CoreML Forecast
+
+
+// CoreML Forecast seven day price forecasing 
     private func updateForecast() {
-        guard !hasNoData else {
+        guard !hasNoData else { //no data don't call the model
             priceForecast = nil
             return
         }
+
+
+ //average calculate        
+       
+ let modelChangePct = prevWeekAverage > 0
+            ? ((thisWeekTrueAverage - prevWeekAverage) / prevWeekAverage) * 100
+            : weeklyChangePercent
+       
+        //training data include in data set 19 in single week
+
+        let clampedTxCount = min(weeklyTransactionCount, 19)
         priceForecast = PriceForecastEngine.shared.predict(
             zoneID:                  selectedZone.id == "all" ? "kurunegala" : selectedZone.id,
-            weeklyAvgPrice:          currentMarketAverage,
+            weeklyAvgPrice:          thisWeekTrueAverage,
             prevWeekAvgPrice:        prevWeekAverage,
-            weeklyChangePct:         weeklyChangePercent,
-            weeklyTransactionCount:  weeklyTransactionCount
+            weeklyChangePct:         modelChangePct,
+            weeklyTransactionCount:  clampedTxCount
         )
     }
 
-    // MARK: - Formatted Helpers
+
+
+
+
+
+//cahart 
+  
     var hasNoData: Bool {
         priceHistory.allSatisfy { $0.price == 0 }
     }

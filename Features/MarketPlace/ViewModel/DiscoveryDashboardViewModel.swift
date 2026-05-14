@@ -9,7 +9,7 @@ import CoreLocation
 @MainActor
 class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
 
-    // MARK: - Real Device GPS
+   
     private let locationManager = CLLocationManager()
     var deviceLocation: CLLocationCoordinate2D? = nil
 
@@ -46,32 +46,58 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
     var isLoadingSellers = false
     private var sellersListener: ListenerRegistration?
 
-    // MARK: - Highest Bids Per Seller (sellerID → highest bid amount)
+  
     var highestBids: [String: Double] = [:]
     private var bidsListener: ListenerRegistration?
 
-    // MARK: - Active Harvest Lots (from harvestLots collection)
+    
+     //when buyer placed bid for seller and when accept it locked
+
+    var lockedSellerIDs:  Set<String> = []
+    var lockedHarvestIDs: Set<String> = []
+    private var activeContractSellerIDs:    Set<String> = []
+    private var activeContractHarvestIDs:   Set<String> = []
+    private var completedContractSellerIDs: Set<String> = []
+    private var completedContractHarvestIDs: Set<String> = []
+    private var acceptedBidSellerIDs:       Set<String> = []
+    private var acceptedBidHarvestIDs:      Set<String> = []
+    private var myBidsListener: ListenerRegistration?
+
+    
+    //after contract renew
+    
+    private func recomputeLocks() {
+        let completedSellers = completedContractSellerIDs.union(completedContractHarvestIDs)
+        let activeBidSellerLocks  = acceptedBidSellerIDs.subtracting(completedSellers)
+        let activeBidHarvestLocks = acceptedBidHarvestIDs.subtracting(completedContractHarvestIDs)
+        lockedSellerIDs  = activeContractSellerIDs.union(activeBidSellerLocks)
+        lockedHarvestIDs = activeContractHarvestIDs.union(activeBidHarvestLocks)
+    }
+
+   
     var activeHarvests: [HarvestLotItem] = []
     var isLoadingHarvests = false
     private var harvestsListener: ListenerRegistration?
 
-    // MARK: - Seller Ratings Map (sellerID → (averageRating, ratingCount))
+  
     var sellerRatings: [String: (Double, Int)] = [:]
     private var sellerRatingsListener: ListenerRegistration?
 
-    // MARK: - Buyer Profile (used by ML engine)
+   
     private var buyerVolume: Int = 5000
     private var buyerNeedsExport: Bool = false
-    // Buyer's own registered coordinate — never changes with search; used for ML scoring
+   
     private var buyerCoordinate: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 7.4818, longitude: 80.3609)
 
-    // MARK: - Historical Transactions Per Seller (sellerID → count of completed contracts)
+   
     private var historicalTransactions: [String: Int] = [:]
     private var contractsListener: ListenerRegistration?
 
-    // MARK: - ML-Scored Recommendations Cache
+ 
     var mlRecommendedSellers: [SellerLocation] = []
     var mlRecommendedHarvests: [HarvestLotItem] = []
+
+
 
     override init() {
         super.init()
@@ -79,6 +105,7 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
         fetchUserProfile()
         attachSellersListener()
         attachBidsListener()
+        attachMyBidsListener()
         attachHarvestsListener()
         attachSellerRatingsListener()
         attachContractsListener()
@@ -193,7 +220,7 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
     }
 
    
-    private func attachSellersListener() {  //seller recomendation 
+    private func attachSellersListener() {  
         isLoadingSellers = true
         sellersListener = Firestore.firestore()
             .collection("users")
@@ -251,6 +278,7 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
             }
     }
 
+
     
     private func attachBidsListener() {
         bidsListener = Firestore.firestore()
@@ -282,6 +310,37 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
     }
 
    
+   
+    private func attachMyBidsListener() {
+        myBidsListener = Firestore.firestore()
+            .collection("bids")
+            .whereField("wasAccepted", isEqualTo: true)
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+
+                var sellerLocks:  Set<String> = []
+                var harvestLocks: Set<String> = []
+
+                for doc in docs {
+                    let data      = doc.data()
+                    let harvestID = data["harvestID"] as? String ?? ""
+                    if !harvestID.isEmpty {
+                        // Bid on a harvest lot — gray 
+                        harvestLocks.insert(harvestID)
+                    } else {
+                        // Bid on a registered seller directly — gray the seller card
+                        if let sellerID = data["sellerID"] as? String, !sellerID.isEmpty {
+                            sellerLocks.insert(sellerID)
+                        }
+                    }
+                }
+
+                self.acceptedBidSellerIDs  = sellerLocks
+                self.acceptedBidHarvestIDs = harvestLocks
+                self.recomputeLocks()
+            }
+    }
+
     func highestBid(for seller: SellerLocation) -> Double {
         highestBids[seller.id] ?? 0.0
     }
@@ -355,7 +414,7 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
             }
     }
 
-    // MARK: - Live Harvests Listener (all sellers' active harvest and sellers create harvest)
+    
     private func attachHarvestsListener() {
         isLoadingHarvests = true
         harvestsListener = Firestore.firestore()  // firebse harvest lost collection
@@ -393,20 +452,62 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
         }
 
         contractsListener?.remove()
+
+        // Global listener — locks sellers/harvests that have ANY active contract from ANY buyer
         contractsListener = Firestore.firestore()
             .collection("contracts")
-            .whereField("buyerID", isEqualTo: buyerID)
-            .whereField("status", isEqualTo: "completed")
             .addSnapshotListener { [weak self] snapshot, _ in
                 guard let self, let docs = snapshot?.documents else { return }
-                var counts: [String: Int] = [:]
+
+                var counts:             [String: Int] = [:]
+                var activeSellerIDs:    Set<String>   = []
+                var activeHarvestIDs:   Set<String>   = []
+                var completedSellerIDs: Set<String>   = []
+                var completedHarvestIDs: Set<String>  = []
+
                 for doc in docs {
-                    let sellerID = (doc.data()["sellerID"] as? String) ?? ""
-                    if !sellerID.isEmpty {
+                    let data            = doc.data()
+                    let sellerID        = data["sellerID"] as? String ?? ""
+                    let contractBuyerID = data["buyerID"]  as? String ?? ""
+                    let status          = data["status"]   as? String ?? ""
+                    guard !sellerID.isEmpty else { continue }
+
+                    let source = data["source"] as? String ?? ""
+                    let isDone = status == "completed" || status == "rejected"
+
+                    // ML scoring: count only this buyer's completed contracts
+                    if status == "completed", contractBuyerID == buyerID {
                         counts[sellerID, default: 0] += 1
                     }
+
+                    // Only bid-based contracts lock on buyer dashboard
+                    guard source == "bid" else { continue }
+
+                    let harvestID = data["harvestID"] as? String ?? ""
+
+                    if isDone {
+                        if !harvestID.isEmpty {
+                            completedHarvestIDs.insert(harvestID)
+                        } else {
+                            completedSellerIDs.insert(sellerID)
+                        }
+                    } else {
+                        if !harvestID.isEmpty {
+                            // Bid on harvest — gray only harvest
+                            activeHarvestIDs.insert(harvestID)
+                        } else {
+                            // Bid on registered seller — gray seller
+                            activeSellerIDs.insert(sellerID)
+                        }
+                    }
                 }
-                self.historicalTransactions = counts
+
+                self.historicalTransactions     = counts
+                self.activeContractSellerIDs    = activeSellerIDs
+                self.activeContractHarvestIDs   = activeHarvestIDs
+                self.completedContractSellerIDs  = completedSellerIDs
+                self.completedContractHarvestIDs = completedHarvestIDs
+                self.recomputeLocks()
                 self.computeMLRecommendations()
             }
     }
@@ -421,8 +522,8 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
             let scoredSellers: [(SellerLocation, Double)] = allSellers.map { seller in
                 let sellerVolume    = RecommendationEngine.parseVolume(seller.typicalYield)
                 let sellerHasExport = seller.certificationLevel.lowercased().contains("export")
-                let sellerBid       = highestBids[seller.id] ?? 0
-                let priceDelta      = sellerBid - avgMarketBid
+                let sellerBid       = highestBids[seller.id] ?? 0 //current higihet Bid
+                let priceDelta      = sellerBid - avgMarketBid  //kamla bid vs market average
                 let txCount         = historicalTransactions[seller.id] ?? 0
 
                 let score = engine.scoreSellerForBuyer(
@@ -473,7 +574,10 @@ class DiscoveryDashboardViewModel: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    // Geocode Helper (Resolves a town name to coordinates via MKLocalSearch)
+
+
+
+   //location search
     private func geocode(locationName: String) async -> CLLocationCoordinate2D? {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = locationName + ", Sri Lanka"

@@ -1,4 +1,3 @@
-// Location: New-Pol-Mure/Features/MarketPlace/ViewModels/UrgentBoardViewModel.swift
 
 import SwiftUI
 import FirebaseFirestore
@@ -13,14 +12,14 @@ private final class UrgentBoardListenerBox {
 @MainActor
 class UrgentBoardViewModel {
 
-    // MARK: - Live Data
+   
     var activeRequests: [UrgentRequest] = []
 
-    // MARK: - Loading & Posting States
+  
     var isLoadingRequests = false
     var isPosting         = false
 
-    // MARK: - Computed: only this buyer's own posts
+    
     var myRequests: [UrgentRequest] {
         activeRequests.filter { $0.buyerID == currentBuyerID }
     }
@@ -37,7 +36,7 @@ class UrgentBoardViewModel {
         attachRequestsListener()
     }
 
-    // MARK: - Fetch Buyer Profile (name + location for new posts)
+  
     private func fetchBuyerProfile() {
         guard !currentBuyerID.isEmpty else { return }
 
@@ -51,7 +50,8 @@ class UrgentBoardViewModel {
             }
     }
 
-    // MARK: - Live Listener: all urgent requests (sellers can see all; buyer sees filtered via myRequests)
+
+   
     private func attachRequestsListener() {
         guard !currentBuyerID.isEmpty else { return }
         isLoadingRequests = true
@@ -75,7 +75,9 @@ class UrgentBoardViewModel {
             }
     }
 
-    // MARK: - Post New Urgent Request
+
+//sellers can view in Urgent need section 
+  
     func postUrgentRequest(quantity: Int, grade: String, deadline: Date, onSuccess: @escaping @MainActor () -> Void = {}) {
         guard !currentBuyerID.isEmpty else { return }
         isPosting = true
@@ -97,7 +99,7 @@ class UrgentBoardViewModel {
                 self.isPosting = false
                 return
             }
-            // Mark this buyer as urgent so sellers see them under "Urgent Need"
+           
             db.collection("users").document(self.currentBuyerID)
                 .updateData(["isUrgent": true]) { error in
                     if let error { print("isUrgent update error: \(error.localizedDescription)") }
@@ -107,7 +109,7 @@ class UrgentBoardViewModel {
         }
     }
 
-    // MARK: - Delete Urgent Request
+ 
     func deleteRequest(_ request: UrgentRequest) {
         let db = Firestore.firestore()
         db.collection("urgentRequests").document(request.id).delete { [weak self] error in

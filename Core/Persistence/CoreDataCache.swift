@@ -128,6 +128,7 @@ final class CoreDataCache {
                 cached.harvestID    = b.harvestID
                 cached.amount       = b.amount
                 cached.status       = b.status
+                cached.wasAccepted  = b.wasAccepted
                 cached.placedAt     = b.placedAt
                 cached.ownerID      = ownerID
             }
@@ -149,14 +150,15 @@ final class CoreDataCache {
                 let placedAt  = cached.placedAt
             else { return nil }
             return Bid(id: id, data: [
-                "sellerID":   sellerID,
-                "sellerName": cached.sellerName ?? "",
-                "bidderID":   bidderID,
-                "bidderName": bidderName,
-                "harvestID":  cached.harvestID ?? "",
-                "amount":     cached.amount,
-                "status":     cached.status ?? "pending",
-                "placedAt":   Timestamp(date: placedAt)
+                "sellerID":    sellerID,
+                "sellerName":  cached.sellerName ?? "",
+                "bidderID":    bidderID,
+                "bidderName":  bidderName,
+                "harvestID":   cached.harvestID ?? "",
+                "amount":      cached.amount,
+                "status":      cached.status ?? "pending",
+                "wasAccepted": cached.wasAccepted,
+                "placedAt":    Timestamp(date: placedAt)
             ])
         }
     }
