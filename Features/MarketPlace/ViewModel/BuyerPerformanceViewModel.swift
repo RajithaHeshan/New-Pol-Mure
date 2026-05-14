@@ -19,18 +19,18 @@ private let buyerPerfMonthFormatter: DateFormatter = {
 @MainActor
 class BuyerPerformanceViewModel {
 
-    // MARK: - Timeframe Picker
+   
     var selectedTimeframe = "Month"
     let timeframes = ["Week", "Month", "Year"]
 
-    // MARK: - KPI Values (all timeframe-filtered)
+    
     var totalVolumeNuts: Int = 0
     var winRate: Int         = 0
 
-    // MARK: - Chart Data
+  
     var detailedSpendData: [DetailedSpendData] = []
 
-    // MARK: - Dynamic KPI (computed from filtered chart data)
+   
     var totalSpend: Double {
         detailedSpendData.reduce(0) { $0 + $1.amount }
     }
@@ -39,17 +39,17 @@ class BuyerPerformanceViewModel {
         detailedSpendData.allSatisfy { $0.amount == 0 }
     }
 
-    // MARK: - Dynamic Insights
+  
     var insightSourcingDesc: String      = "Analysing your acquisition cost…"
     var insightBidSuccessDesc: String    = "Analysing your bid win rate…"
     var insightOfferRelianceDesc: String = "Analysing your spend mix…"
 
-    // MARK: - Loading State
+
     var isLoading = false
 
     private let currentBuyerID: String
 
-    // Raw fetched data — kept all-time; re-filtered on timeframe change
+    
     private var allTransactions: [Transaction] = []
     private var allBids:         [Bid]         = []
 
@@ -59,7 +59,7 @@ class BuyerPerformanceViewModel {
     init() {
         self.currentBuyerID = AuthManager.shared.currentUserID
         if currentBuyerID.isEmpty {
-            // Face ID login may not have saved session yet — retry once after 1s
+          
             Task {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 self.attachTransactionsListener()
@@ -75,7 +75,7 @@ class BuyerPerformanceViewModel {
         recompute()
     }
 
-    // MARK: - Rolling window start for the selected timeframe
+   
     private func windowStart(calendar: Calendar, now: Date) -> Date {
         switch selectedTimeframe {
         case "Week":  return calendar.date(byAdding: .day,   value: -6,  to: calendar.startOfDay(for: now)) ?? now
@@ -84,7 +84,7 @@ class BuyerPerformanceViewModel {
         }
     }
 
-    // MARK: - Listeners
+  
 
     private func attachTransactionsListener() {
         guard !currentBuyerID.isEmpty else { return }
@@ -108,6 +108,7 @@ class BuyerPerformanceViewModel {
             }
     }
 
+
     private func attachBidsListener() {
         guard !currentBuyerID.isEmpty else { return }
 
@@ -127,21 +128,21 @@ class BuyerPerformanceViewModel {
             }
     }
 
-    // MARK: - Central recompute
+  
     private func recompute() {
         let calendar = Calendar.current
         let now      = Date()
         let start    = windowStart(calendar: calendar, now: now)
 
-        // Filter transactions by completedAt (when money actually moved)
+        
         let windowTransactions = allTransactions.filter { $0.completedAt >= start }
-        // Filter contracts by completedAt via matching transactions — use transaction quantity for accuracy
+       
         let windowBids         = allBids.filter { $0.placedAt >= start }
 
-        // Nuts acquired = sum of quantities from window transactions (completedAt is accurate)
+       
         totalVolumeNuts = windowTransactions.reduce(0) { $0 + $1.quantity }
 
-        // Win rate: compare buyer's top bid per harvest against ALL bids in the same window only
+       
         var highestBidPerHarvest: [String: Double] = [:]
         for bid in windowBids {
             if (highestBidPerHarvest[bid.harvestID] ?? 0) < bid.amount {
@@ -166,7 +167,11 @@ class BuyerPerformanceViewModel {
         updateInsights(windowTransactions: windowTransactions)
     }
 
-    // MARK: - Chart bucket grouping
+
+
+
+
+    //grouping 
     private func recomputeChartData(transactions: [Transaction], calendar: Calendar, now: Date) {
         var bidsBuckets:   [String: Double] = [:]
         var offersBuckets: [String: Double] = [:]
@@ -192,7 +197,9 @@ class BuyerPerformanceViewModel {
         detailedSpendData = result
     }
 
-    // MARK: - Period label for a single transaction date
+
+
+   //time period 
     private func periodLabel(for date: Date, calendar: Calendar, now: Date) -> String {
         switch selectedTimeframe {
         case "Week":
@@ -212,7 +219,9 @@ class BuyerPerformanceViewModel {
         }
     }
 
-    // MARK: - Ordered x-axis labels
+
+
+   //x-axixs 
     private func orderedPeriodLabels(calendar: Calendar, now: Date) -> [String] {
         switch selectedTimeframe {
         case "Week":
@@ -232,7 +241,11 @@ class BuyerPerformanceViewModel {
         }
     }
 
-    // MARK: - Dynamic Insights
+
+
+
+
+  //Dynamic insights
     private func updateInsights(windowTransactions: [Transaction]) {
         let offersSpend = detailedSpendData.filter { $0.source == "Accepted Offers" }.reduce(0) { $0 + $1.amount }
         let offerPct    = totalSpend > 0 ? Int((offersSpend / totalSpend) * 100) : 0

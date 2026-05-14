@@ -122,7 +122,9 @@ struct DiscoveryDashboardView: View {
                         ForEach(viewModel.recommendedSellers) { seller in
                             RecommendedSellerCard(
                                 seller: seller,
-                                currentHighestBid: viewModel.highestBid(for: seller)
+                                currentHighestBid: viewModel.highestBid(for: seller),
+                                isBidLocked: viewModel.lockedSellerIDs.contains(seller.id)
+                                          || viewModel.lockedHarvestIDs.contains(seller.id)
                             )
                         }
                         // Harvest lots created by sellers
@@ -131,7 +133,9 @@ struct DiscoveryDashboardView: View {
                                 harvest: harvest,
                                 currentHighestBid: viewModel.highestBid(for: harvest),
                                 sellerRating: viewModel.sellerRatings[harvest.sellerID]?.0 ?? 0.0,
-                                sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0
+                                sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0,
+                                isBidLocked: viewModel.lockedHarvestIDs.contains(harvest.id)
+                                          || viewModel.lockedSellerIDs.contains(harvest.sellerID)
                             )
                         }
                     }
@@ -272,18 +276,36 @@ struct DiscoveryDashboardView: View {
             } else {
                 LazyVStack(spacing: 16) {
                     ForEach(viewModel.sellersInRadius) { seller in
-                        SellerRow(seller: seller, currentHighestBid: viewModel.highestBid(for: seller))
+                        SellerRow(
+                            seller: seller,
+                            currentHighestBid: viewModel.highestBid(for: seller),
+                            isBidLocked: viewModel.lockedSellerIDs.contains(seller.id)
+                                      || viewModel.lockedHarvestIDs.contains(seller.id)
+                        )
                     }
                     ForEach(viewModel.harvestsInRadius) { harvest in
-                        NavigationLink(value: harvest.id) {
+                        let harvestLocked = viewModel.lockedHarvestIDs.contains(harvest.id)
+                                        || viewModel.lockedSellerIDs.contains(harvest.sellerID)
+                        if harvestLocked {
                             HarvestRowCard(
                                 harvest: harvest,
                                 currentHighestBid: viewModel.highestBid(for: harvest),
                                 sellerRating: viewModel.sellerRatings[harvest.sellerID]?.0 ?? 0.0,
-                                sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0
+                                sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0,
+                                isBidLocked: true
                             )
+                        } else {
+                            NavigationLink(value: harvest.id) {
+                                HarvestRowCard(
+                                    harvest: harvest,
+                                    currentHighestBid: viewModel.highestBid(for: harvest),
+                                    sellerRating: viewModel.sellerRatings[harvest.sellerID]?.0 ?? 0.0,
+                                    sellerRatingCount: viewModel.sellerRatings[harvest.sellerID]?.1 ?? 0,
+                                    isBidLocked: false
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                 }
                 .padding(.horizontal)

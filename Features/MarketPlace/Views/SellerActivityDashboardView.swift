@@ -254,7 +254,7 @@ struct SellerDirectBidRow: View {
                         .foregroundColor(.green)
 
                     // Status badge — shown after seller acts
-                    if bid.status == "accepted" {
+                    if bid.wasAccepted || bid.status == "accepted" {
                         Text("Accepted")
                             .font(.caption2.bold())
                             .padding(.horizontal, 8)
@@ -275,7 +275,7 @@ struct SellerDirectBidRow: View {
             }
 
             
-            if bid.status == "pending" {
+            if bid.status == "pending" && !bid.wasAccepted {
                 HStack(spacing: 12) {
                     Button(action: onAccept) {
                         Text("Accept Bid")

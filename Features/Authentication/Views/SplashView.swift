@@ -89,10 +89,13 @@ struct SplashView: View {
    
     @ViewBuilder
     private var homeView: some View {
+        let userID = AuthManager.shared.currentUserID
         if userRole == "BUYER" || userRole == "Buyer" {
             BuyerTabView()
+                .id("buyer-\(userID)")
         } else {
             SellerTabView()
+                .id("seller-\(userID)")
         }
     }
 }

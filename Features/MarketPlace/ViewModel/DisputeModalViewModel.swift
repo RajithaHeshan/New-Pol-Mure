@@ -1,4 +1,3 @@
-// Location: New-Pol-Mure/Features/Marketplace/ViewModels/DisputeModalViewModel.swift
 
 import SwiftUI
 import FirebaseAuth
@@ -8,13 +7,13 @@ import FirebaseFirestore
 @MainActor
 class DisputeModalViewModel {
 
-    // MARK: - Action States
+   
     var isSubmitting  = false
     var isCancelling  = false
     var submitError: String? = nil
     var cancelError: String? = nil
 
-    // MARK: - Constant Data
+
     let originalBid: Double
     let contractID: String
     let reasons = ["Quality (Rotten/Spoiled)", "Undersized Nuts", "Short Quantity", "Other"]
@@ -24,7 +23,7 @@ class DisputeModalViewModel {
         self.originalBid = originalBid
     }
 
-    // MARK: - Submit Counter-Offer
+   
     func submitCounterOffer(
         reason: String,
         notes: String,
@@ -81,7 +80,7 @@ class DisputeModalViewModel {
         }
     }
 
-    // MARK: - Cancel Contract Entirely
+ 
     func cancelContractEntirely(onSuccess: @escaping @MainActor () -> Void) {
         guard !contractID.isEmpty else { return }
 
@@ -105,3 +104,5 @@ class DisputeModalViewModel {
         }
     }
 }
+
+

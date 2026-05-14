@@ -134,6 +134,7 @@ struct RecommendedBuyerCard: View {
     let buyer: RegisteredBuyer
     var highestOffer: Double?
     var showUrgentBadge: Bool = false
+    var isPitchLocked: Bool = false
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -175,6 +176,15 @@ struct RecommendedBuyerCard: View {
                     .foregroundColor(.green)
                     .padding(.top, 2)
                 }
+
+                Text(isPitchLocked ? "Pitched" : "Pitch Offer")
+                    .font(.caption.bold())
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(isPitchLocked ? Color.gray.opacity(0.3) : Color.orange)
+                    .foregroundColor(isPitchLocked ? .secondary : .white)
+                    .clipShape(Capsule())
+                    .padding(.top, 4)
             }
             .padding(.top, 8)
         }
@@ -183,6 +193,7 @@ struct RecommendedBuyerCard: View {
         .background(Color(UIColor.secondarySystemBackground))
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .opacity(isPitchLocked ? 0.75 : 1.0)
     }
 }
 
@@ -190,6 +201,7 @@ struct BuyerRowCard: View {
     let buyer: RegisteredBuyer
     var highestOffer: Double?
     var showUrgentBadge: Bool = false
+    var isPitchLocked: Bool = false
 
     var body: some View {
         NavigationLink(destination: LiveOfferView(buyer: buyer)) {
@@ -221,20 +233,23 @@ struct BuyerRowCard: View {
                     Text(highestOffer.map { "Rs \(String(format: "%.0f", $0))" } ?? "—")
                         .font(.subheadline.bold())
                         .foregroundColor(.orange)
-                    Text("Pitch Offer")
+                    Text(isPitchLocked ? "Pitched" : "Pitch Offer")
                         .font(.caption.bold())
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .background(Color.orange)
-                        .foregroundColor(.white)
+                        .background(isPitchLocked ? Color.gray.opacity(0.3) : Color.orange)
+                        .foregroundColor(isPitchLocked ? .secondary : .white)
                         .clipShape(Capsule())
                 }
             }
             .padding()
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(12)
+            .opacity(isPitchLocked ? 0.75 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isPitchLocked)
+        .allowsHitTesting(!isPitchLocked)
     }
 }
 
@@ -242,6 +257,7 @@ struct UrgentPostCard: View {
     let post: UrgentRequest
     let buyer: RegisteredBuyer
     var highestOffer: Double?
+    var isPitchLocked: Bool = false
 
     var urgencyColor: Color {
         let hoursLeft = post.deadline.timeIntervalSinceNow / 3600
@@ -279,16 +295,16 @@ struct UrgentPostCard: View {
                         .foregroundColor(.secondary)
                     Text(highestOffer.map { "Rs \(String(format: "%.0f", $0))" } ?? "—")
                         .font(.subheadline.bold())
-                        .foregroundColor(urgencyColor)
+                        .foregroundColor(isPitchLocked ? .secondary : urgencyColor)
                     Text(post.deadline, style: .relative)
                         .font(.caption2)
                         .foregroundColor(urgencyColor)
-                    Text("Pitch Offer")
+                    Text(isPitchLocked ? "Pitched" : "Pitch Offer")
                         .font(.caption.bold())
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(urgencyColor)
-                        .foregroundColor(.white)
+                        .background(isPitchLocked ? Color.gray.opacity(0.3) : urgencyColor)
+                        .foregroundColor(isPitchLocked ? .secondary : .white)
                         .clipShape(Capsule())
                 }
             }
@@ -296,8 +312,11 @@ struct UrgentPostCard: View {
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(12)
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(urgencyColor.opacity(0.4), lineWidth: 1))
+            .opacity(isPitchLocked ? 0.75 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isPitchLocked)
+        .allowsHitTesting(!isPitchLocked)
     }
 }
 

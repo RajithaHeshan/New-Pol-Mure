@@ -38,13 +38,6 @@ struct SellerContractView: View {
                             .padding(.horizontal)
                         }
                         
-                        // WeatherKit Integration Warning Card (Seller Theme)
-                        if !viewModel.isDisputed && viewModel.currentState == .buyerEnRoute {
-                            // Assumes WeatherForecastCard is already in your project from the Buyer side
-                            WeatherForecastCard(locationName: "Your Estate", date: viewModel.inspectionDate, themeColor: .orange)
-                                .padding(.horizontal)
-                        }
-                        
                         // EventKit Logic: Show calendar only when buyer is en route (not after quality approved)
                         if !viewModel.isDisputed && viewModel.currentState == .buyerEnRoute && viewModel.inspectionDate > Date() {
                             calendarSchedulingCard
@@ -80,8 +73,10 @@ struct SellerContractView: View {
             }
         }
     }
+
+
     
-    // MARK: - UI Modules
+    // green banner 
     private var escrowSecurityCard: some View {
         VStack(spacing: 12) {
             HStack {
@@ -100,6 +95,9 @@ struct SellerContractView: View {
         .padding(.horizontal)
     }
     
+
+
+
     private var qualityApprovedInfoCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
@@ -121,6 +119,10 @@ struct SellerContractView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.blue.opacity(0.3), lineWidth: 1))
         .padding(.horizontal)
     }
+
+    
+
+//orange calender 
 
     private var calendarSchedulingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -161,12 +163,15 @@ struct SellerContractView: View {
         .padding().background(Color(UIColor.secondarySystemGroupedBackground)).cornerRadius(16).padding(.horizontal)
     }
     
+    
+    
+    
     @ViewBuilder
     private var stickyBottomAction: some View {
         VStack {
             Spacer()
             if viewModel.isDisputed {
-                // Dispute blocks all handover actions
+              
                 Text("Please resolve the dispute above to continue.")
                     .font(.caption.bold())
                     .foregroundColor(.red)
@@ -222,7 +227,8 @@ struct SellerContractView: View {
                         .cornerRadius(10)
                     }
 
-                    // Step 2 — Confirm Handover (enabled only after quality verified)
+                   //confirm handover
+
                     Button(action: {
                         withAnimation { viewModel.confirmHandover() }
                     }) {
@@ -289,6 +295,10 @@ struct ContractSummaryCard: View {
         .padding().background(Color(UIColor.secondarySystemGroupedBackground)).cornerRadius(12)
     }
 }
+
+
+
+//Dispute alert card (red)
 
 struct SellerDisputeAlertCard: View {
     let reason:        String
@@ -398,6 +408,9 @@ struct SellerDisputeAlertCard: View {
     }
 }
 
+
+//tracket 
+
 struct SellerFSMTracker: View {
     let currentState: SellerContractState
 
@@ -414,6 +427,8 @@ struct SellerFSMTracker: View {
     }
 }
 
+
+//change timeline
 struct SellerTimelineRow: View {
     let title: String; let subtitle: String
     let isCompleted: Bool; let isActive: Bool

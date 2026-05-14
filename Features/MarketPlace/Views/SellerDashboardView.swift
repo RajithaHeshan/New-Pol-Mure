@@ -79,10 +79,13 @@ struct SellerDashboardView: View {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 16) {
                                         ForEach(viewModel.recommendedBuyers) { buyer in
+                                            let locked = viewModel.lockedBuyerIDs.contains(buyer.id)
                                             NavigationLink(destination: LiveOfferView(buyer: buyer)) {
-                                                RecommendedBuyerCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id], showUrgentBadge: false)
+                                                RecommendedBuyerCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id], showUrgentBadge: false, isPitchLocked: locked)
                                             }
                                             .buttonStyle(PlainButtonStyle())
+                                            .disabled(locked)
+                                            .allowsHitTesting(!locked)
                                         }
                                     }
                                     .padding(.horizontal)
@@ -189,7 +192,8 @@ struct SellerDashboardView: View {
                                         UrgentPostCard(
                                             post: post,
                                             buyer: viewModel.buyer(for: post),
-                                            highestOffer: viewModel.highestUrgentPitchPerBuyer[post.buyerID]
+                                            highestOffer: viewModel.highestUrgentPitchPerBuyer[post.buyerID],
+                                            isPitchLocked: viewModel.lockedBuyerIDs.contains(post.buyerID)
                                         )
                                     }
                                 }
@@ -214,7 +218,11 @@ struct SellerDashboardView: View {
                             } else {
                                 LazyVStack(spacing: 16) {
                                     ForEach(viewModel.buyersInRadius) { buyer in
-                                        BuyerRowCard(buyer: buyer, highestOffer: viewModel.highestOfferPerBuyer[buyer.id])
+                                        BuyerRowCard(
+                                            buyer: buyer,
+                                            highestOffer: viewModel.highestOfferPerBuyer[buyer.id],
+                                            isPitchLocked: viewModel.lockedBuyerIDs.contains(buyer.id)
+                                        )
                                     }
                                 }
                                 .padding(.horizontal)

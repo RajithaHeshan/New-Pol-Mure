@@ -1,6 +1,7 @@
 import CoreML
 
-// Zone ID encoding — must match the CSV training data
+// distric conver to numbers
+
 private let zoneEncoding: [String: Int64] = [
     "anuradhapura": 0,
     "colombo":      1,
@@ -14,10 +15,15 @@ private let zoneEncoding: [String: Int64] = [
     "ratnapura":    9,
 ]
 
+
+//out put of the model
+
 struct PriceForecast {
-    let predictedPrice: Double   // Rs per nut, 7 days from now
+    let predictedPrice: Double   
     let zoneName: String
 }
+
+
 
 final class PriceForecastEngine {
 
@@ -26,11 +32,14 @@ final class PriceForecastEngine {
     private let model: CoconutPriceForecaster_1?
 
     private init() {
-        model = try? CoconutPriceForecaster_1(configuration: MLModelConfiguration())
+        model = try? CoconutPriceForecaster_1(configuration: MLModelConfiguration()) //app run without crazing 
     }
 
-    // MARK: - Predict 7-day price for a given zone using live market data
-    // All inputs come directly from MarketAnalyticsViewModel — no new queries needed.
+
+
+    //  Predict 7-day price  
+   
+
     func predict(
         zoneID: String,
         weeklyAvgPrice: Double,
@@ -44,12 +53,14 @@ final class PriceForecastEngine {
         let calendar   = Calendar.current
         let now        = Date()
         let month      = Int64(calendar.component(.month,   from: now))
+
+
         // Convert Apple weekday (1=Sun...7=Sat) to 0=Mon...6=Sun
         let appleWeekday = calendar.component(.weekday, from: now)
-        let dayOfWeek    = Int64((appleWeekday + 5) % 7)
+        let dayOfWeek    = Int64((appleWeekday + 5) % 7) //apple day conver to normla day 
 
-        let encodedZone  = zoneEncoding[zoneID] ?? 0
-        let prevAvg      = prevWeekAvgPrice > 0 ? prevWeekAvgPrice : weeklyAvgPrice
+        guard let encodedZone = zoneEncoding[zoneID] else { return nil }
+        let prevAvg      = prevWeekAvgPrice > 0 ? prevWeekAvgPrice : weeklyAvgPrice  //prevent app crash 
         let txCount      = Int64(max(1, weeklyTransactionCount))
 
         let input = CoconutPriceForecaster_1Input(
@@ -64,9 +75,9 @@ final class PriceForecastEngine {
 
         guard let output = try? model.prediction(input: input) else { return nil }
 
-        let predicted = max(50.0, min(200.0, output.predicted_price_7d))
+        let predicted = max(50.0, min(200.0, output.predicted_price_7d)) //cocount price range
 
-        return PriceForecast(
+        return PriceForecast( //call maeket anaylsis
             predictedPrice: predicted,
             zoneName: zoneID
         )

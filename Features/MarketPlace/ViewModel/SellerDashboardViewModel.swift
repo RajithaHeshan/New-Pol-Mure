@@ -78,13 +78,29 @@ class SellerDashboardViewModel {
     private var historicalTransactions: [String: Int] = [:]
     private let historyListenerBox = DashboardListenerBox()
 
-    
+ 
     var mlRecommendedBuyers: [RegisteredBuyer] = []
+
+    // MARK: - Pitch lock state for buyer cards on seller dashboard
+    // When a buyer accepts a pitch → gray that buyer's card for ALL sellers until contract completes.
+    var lockedBuyerIDs: Set<String> = []
+    private var acceptedOfferBuyerIDs:     Set<String> = []
+    private var activeContractBuyerIDs:    Set<String> = []
+    private var completedContractBuyerIDs: Set<String> = []
+    private let acceptedOffersListenerBox  = DashboardListenerBox()
+    private let globalContractsListenerBox = DashboardListenerBox()
+
+    private func recomputeLocks() {
+        let activePitchLocks = acceptedOfferBuyerIDs.subtracting(completedContractBuyerIDs)
+        lockedBuyerIDs = activeContractBuyerIDs.union(activePitchLocks)
+    }
 
     init() {
         fetchUserProfile()
         attachBuyersListener()
         attachOffersListener()
+        attachAcceptedOffersListener()
+        attachGlobalContractsListener()
         attachUrgentListeners()
         attachUrgentRequestsListener()
         attachContractsHistoryListener()
@@ -142,7 +158,56 @@ class SellerDashboardViewModel {
             }
     }
 
-   
+    private func attachAcceptedOffersListener() {
+        acceptedOffersListenerBox.listener = Firestore.firestore()
+            .collection("offers")
+            .whereField("wasAccepted", isEqualTo: true)
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+                var buyerLocks: Set<String> = []
+                for doc in docs {
+                    let data = doc.data()
+                    if let buyerID = data["buyerID"] as? String, !buyerID.isEmpty {
+                        buyerLocks.insert(buyerID)
+                    }
+                }
+                self.acceptedOfferBuyerIDs = buyerLocks
+                self.recomputeLocks()
+            }
+    }
+
+    private func attachGlobalContractsListener() {
+        globalContractsListenerBox.listener = Firestore.firestore()
+            .collection("contracts")
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let self, let docs = snapshot?.documents else { return }
+
+                var activeBuyerIDs:    Set<String> = []
+                var completedBuyerIDs: Set<String> = []
+
+                for doc in docs {
+                    let data    = doc.data()
+                    let buyerID = data["buyerID"] as? String ?? ""
+                    let status  = data["status"]  as? String ?? ""
+                    let source  = data["source"]  as? String ?? ""
+                    guard !buyerID.isEmpty else { continue }
+                    // Only pitch-based contracts lock buyer cards on seller dashboard
+                    guard source == "offer" else { continue }
+
+                    let isDone = status == "completed" || status == "rejected"
+                    if isDone {
+                        completedBuyerIDs.insert(buyerID)
+                    } else {
+                        activeBuyerIDs.insert(buyerID)
+                    }
+                }
+
+                self.activeContractBuyerIDs    = activeBuyerIDs
+                self.completedContractBuyerIDs = completedBuyerIDs
+                self.recomputeLocks()
+            }
+    }
+
     private func attachUrgentRequestsListener() {
         urgentRequestsListenerBox.listener = Firestore.firestore()
             .collection("urgentRequests")
